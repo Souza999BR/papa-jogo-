@@ -1,0 +1,37 @@
+vermelho 
+https://www.pa3333.com/static/img/breed1.accaa049.png
+https://www.pa3333.com/static/game/C9E6E7B69F98F516A54CFE2C9E25FB3F.png
+https://www.pa3333.com/static/img/breed5.2a5b4ea7.png
+https://www.pa3333.com/static/img/breed7.48217642.png
+https://www.pa3333.com/static/img/breed9.a86b0f66.png
+https://www.pa3333.com/static/img/breed11.6a9132f7.png
+azul
+
+https://www.pa3333.com/static/game/8FBDBF5573B18FAE93736180F8D0197A.png
+https://www.pa3333.com/static/img/breed4.b4a2fe63.png
+https://www.pa3333.com/static/game/A5CB00D7C8FFFE5FB2C79C540A54817A.png
+https://www.pa3333.com/static/game/1981E4A762B39858DC33F9EA28ED065A.png
+https://www.pa3333.com/static/img/breed10.4dbcd7a3.png
+https://www.pa3333.com/static/game/2A0270F3B3A57F49C195A7F2B0736564.png
+
+https://www.pa3333.com/static/game/17380DDB842E984302034E1BB66C24E4.png
+
+EA66C06C1E1C05FA9F1AA39D98DC5BC1.png
+
+IMAGENS_AZUL = [
+    "https://www.pa3333.com/static/img/breed2.fd523f3c.png",
+    "https://www.pa3333.com/static/img/breed4.b4a2fe63.png",
+    "https://www.pa3333.com/static/img/breed6.39e1c8ab.png",
+    "https://www.pa3333.com/static/img/breed8.ba7ff842.png",
+    "https://www.pa3333.com/static/img/breed10.4dbcd7a3.png",
+    "https://www.pa3333.com/static/img/breed12.fdf801f0.png"
+]
+
+IMAGENS_VERMELHO = [
+    "https://www.pa3333.com/static/img/breed1.accaa049.png",
+    "https://www.pa3333.com/static/img/breed3.6e8f261e.png",
+    "https://www.pa3333.com/static/img/breed5.2a5b4ea7.png",
+    "https://www.pa3333.com/static/img/breed7.48217642.png",
+    "https://www.pa3333.com/static/img/breed9.a86b0f66.png",
+    "https://www.pa3333.com/static/img/breed11.6a9132f7.png"
+]
