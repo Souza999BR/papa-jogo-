@@ -634,10 +634,10 @@ def calcular_previsao_exata_por_cor(
                 saida.upper()
             )
 
-            # =====================================
+            # =========================
             # AJUSTE:
-            # OPERA CONTRA O PADRÃO
-            # =====================================
+            # INVERTE O PADRÃO
+            # =========================
 
             if (
                 previsao_original
@@ -670,7 +670,7 @@ def calcular_previsao_exata_por_cor(
             )
 
             print(
-                f"🎯 Contra padrão: "
+                f"🎯 Contrapadrão: "
                 f"{previsao}"
             )
 
@@ -681,7 +681,6 @@ def calcular_previsao_exata_por_cor(
     )
 
     return None
-
 
 # ========================
 # PREVISÃO POR CÓDIGO
