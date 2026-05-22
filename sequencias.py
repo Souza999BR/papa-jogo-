@@ -498,19 +498,30 @@ def horarios_sao_consecutivos(historico):
 
             ts = x[0]
 
-            try:
+            # =========================
+            # AJUSTE:
+            # ACEITA DATETIME OU STRING
+            # =========================
 
-                horario = datetime.strptime(
-                    ts,
-                    "%Y-%m-%d %H:%M:%S"
-                )
+            if isinstance(ts, datetime):
 
-            except:
+                horario = ts
 
-                horario = datetime.strptime(
-                    ts,
-                    "%H:%M"
-                )
+            else:
+
+                try:
+
+                    horario = datetime.strptime(
+                        str(ts),
+                        "%Y-%m-%d %H:%M:%S"
+                    )
+
+                except:
+
+                    horario = datetime.strptime(
+                        str(ts),
+                        "%H:%M"
+                    )
 
             horarios.append(horario)
 
@@ -544,7 +555,6 @@ def horarios_sao_consecutivos(historico):
 
         return False
 
-
 # ========================
 # PREVISÃO POR COR
 # ========================
@@ -554,7 +564,7 @@ def calcular_previsao_exata_por_cor(
     caminho_seq='seq.csv'
 ):
 
-    if len(historico_cores) < 4:
+    if len(historico_cores) < 5:
         return None
 
     if not horarios_sao_consecutivos(
@@ -620,11 +630,48 @@ def calcular_previsao_exata_por_cor(
 
         if ultimos == entrada_upper:
 
-            previsao = saida.upper()
+            previsao_original = (
+                saida.upper()
+            )
+
+            # =====================================
+            # AJUSTE:
+            # OPERA CONTRA O PADRÃO
+            # =====================================
+
+            if (
+                previsao_original
+                == "AZUL"
+            ):
+
+                previsao = "VERMELHO"
+
+            elif (
+                previsao_original
+                == "VERMELHO"
+            ):
+
+                previsao = "AZUL"
+
+            else:
+
+                previsao = (
+                    previsao_original
+                )
 
             print(
                 f"✅ Sequência encontrada: "
-                f"{entrada_upper} -> {previsao}"
+                f"{entrada_upper}"
+            )
+
+            print(
+                f"🔄 Padrão original: "
+                f"{previsao_original}"
+            )
+
+            print(
+                f"🎯 Contra padrão: "
+                f"{previsao}"
             )
 
             return previsao
@@ -644,31 +691,279 @@ def calcular_previsao_exata(
     historico_codigos
 ):
 
-    if len(historico_codigos) < 5:
+    if len(historico_codigos) < 12:
 
         print(
-            "⚠️ Histórico insuficiente."
+            "⚠️ Histórico insuficiente por código."
         )
 
         return None
 
-    if not horarios_sao_consecutivos(
-        historico_codigos
-    ):
-        return None
+    # =========================
+    # AJUSTE:
+    # NORMALIZA DATAS DO CSV
+    # =========================
+
+    historico_normalizado = []
 
     try:
 
-        apenas_codigos = [
-            c for _, _, c in historico_codigos
-        ]
+        for horario, cor, codigo in historico_codigos:
+
+            if isinstance(
+                horario,
+                str
+            ):
+
+                horario = datetime.strptime(
+                    horario,
+                    "%Y-%m-%d %H:%M:%S"
+                )
+
+            historico_normalizado.append(
+                (
+                    horario,
+                    cor.upper(),
+                    codigo
+                )
+            )
+
+    except Exception as e:
+
+        print(
+            f"❌ Erro converter horários: {e}"
+        )
+
+        return None
+
+    historico_codigos = (
+        historico_normalizado
+    )
+
+    # =====================================
+    # AJUSTE:
+    # IGNORA PEQUENAS QUEBRAS
+    # DE HORÁRIO
+    # =====================================
+
+    sequencia_valida = []
+
+    for item in historico_codigos:
+
+        sequencia_valida.append(item)
+
+        if len(sequencia_valida) < 4:
+            continue
+
+        if not horarios_sao_consecutivos(
+            sequencia_valida[-4:]
+        ):
+
+            sequencia_valida.pop(0)
+
+    if len(sequencia_valida) < 8:
+
+        print(
+            "⚠️ Nenhuma sequência consecutiva suficiente encontrada."
+        )
+
+        return None
+
+    historico_codigos = sequencia_valida
+
+    try:
+
+        # =========================================
+        # AGRUPA POR HORA
+        # RESET AUTOMÁTICO 1H
+        # =========================================
+
+        blocos_hora = {}
+
+        for horario, cor, codigo in historico_codigos:
+
+            chave_hora = horario.strftime(
+                "%Y-%m-%d %H"
+            )
+
+            blocos_hora.setdefault(
+                chave_hora,
+                []
+            ).append(
+                (
+                    horario,
+                    cor,
+                    codigo
+                )
+            )
 
         TAM_JANELA = 4
+
+        # =========================================
+        # PADRÕES POR COR
+        # =========================================
+
+        padroes_cores = {}
+
+        for hora, dados in blocos_hora.items():
+
+            if len(dados) < (
+                TAM_JANELA + 2
+            ):
+                continue
+
+            apenas_cores = [
+                cor
+                for _, cor, _
+                in dados
+            ]
+
+            for i in range(
+                len(apenas_cores)
+                - TAM_JANELA
+            ):
+
+                janela = tuple(
+                    apenas_cores[
+                        i:i + TAM_JANELA
+                    ]
+                )
+
+                proxima_cor = (
+                    apenas_cores[
+                        i + TAM_JANELA
+                    ]
+                )
+
+                padroes_cores.setdefault(
+                    janela,
+                    []
+                ).append(
+                    proxima_cor
+                )
+
+        apenas_cores_atuais = [
+            cor
+            for _, cor, _
+            in historico_codigos
+        ]
+
+        janela_atual_cores = tuple(
+            apenas_cores_atuais[
+                -TAM_JANELA:
+            ]
+        )
+
+        if (
+            janela_atual_cores
+            not in padroes_cores
+        ):
+
+            print(
+                "⚠️ Sem padrão de cor encontrado."
+            )
+
+            return None
+
+        proximas_cores = (
+            padroes_cores[
+                janela_atual_cores
+            ]
+        )
+
+        # =====================================
+        # AJUSTE:
+        # EVITA FALSO PADRÃO
+        # COM POUCOS DADOS
+        # =====================================
+
+        if len(proximas_cores) < 3:
+
+            print(
+                "⚠️ Poucos padrões encontrados."
+            )
+
+            return None
+
+        contagem_cores = {
+
+            cor: proximas_cores.count(
+                cor
+            )
+
+            for cor in set(
+                proximas_cores
+            )
+        }
+
+        total = len(proximas_cores)
+
+        cor_prevista = max(
+            contagem_cores,
+            key=contagem_cores.get
+        )
+
+        maior_contagem = (
+            contagem_cores[
+                cor_prevista
+            ]
+        )
+
+        confianca = (
+            maior_contagem / total
+        )
+
+        # =====================================
+        # AJUSTE:
+        # EVITA ENTRADA FRACA
+        # =====================================
+
+        if confianca < 0.70:
+
+            print(
+                f"⚠️ Confiança baixa: "
+                f"{confianca:.2%}"
+            )
+
+            return None
+
+        # =====================================
+        # AJUSTE:
+        # EVITA EMPATE ESCONDIDO
+        # =====================================
+
+        candidatos = [
+
+            cor
+
+            for cor, qtd
+            in contagem_cores.items()
+
+            if qtd == maior_contagem
+        ]
+
+        if len(candidatos) > 1:
+
+            print(
+                "⚠️ Empate de padrão."
+            )
+
+            return None
+
+        # =========================================
+        # PREVISÃO POR CÓDIGO
+        # =========================================
+
+        apenas_codigos = [
+            c for _, _, c
+            in historico_codigos
+        ]
 
         padroes = {}
 
         for i in range(
-            len(apenas_codigos) - TAM_JANELA
+            len(apenas_codigos)
+            - TAM_JANELA
         ):
 
             janela = tuple(
@@ -687,88 +982,101 @@ def calcular_previsao_exata(
             ).append(proximo)
 
         janela_atual = tuple(
-            apenas_codigos[-TAM_JANELA:]
+            apenas_codigos[
+                -TAM_JANELA:
+            ]
         )
 
-        if janela_atual not in padroes:
+        proximo_codigo = None
 
-            print(
-                "⚠️ Sem padrão encontrado."
-            )
+        if janela_atual in padroes:
 
-            return None
+            proximos = padroes[
+                janela_atual
+            ]
 
-        proximos = padroes[janela_atual]
+            codigos_filtrados = []
 
-        contagens = {
-            codigo: proximos.count(codigo)
-            for codigo in set(proximos)
-        }
+            for codigo in proximos:
 
-        max_contagem = max(
-            contagens.values()
-        )
-
-        candidatos = [
-            codigo
-            for codigo, count
-            in contagens.items()
-            if count == max_contagem
-        ]
-
-        if len(candidatos) > 1:
-
-            print(
-                "⚠️ Empate encontrado."
-            )
-
-            return None
-
-        proximo_codigo = candidatos[0]
-
-        confianca = (
-            max_contagem / len(proximos)
-        )
-
-        proxima_cor = cor_por_codigo(
-            proximo_codigo
-        )
-
-        if not proxima_cor:
-
-            try:
-
-                proxima_cor = (
-                    "AZUL"
-                    if int(
-                        proximo_codigo,
-                        16
-                    ) % 2 == 0
-                    else "VERMELHO"
+                cor_codigo = (
+                    cor_por_codigo(
+                        codigo
+                    )
                 )
 
-            except:
+                if (
+                    cor_codigo
+                    == cor_prevista
+                ):
 
-                proxima_cor = None
+                    codigos_filtrados.append(
+                        codigo
+                    )
+
+            if codigos_filtrados:
+
+                contagens = {
+
+                    codigo:
+                    codigos_filtrados.count(
+                        codigo
+                    )
+
+                    for codigo
+                    in set(
+                        codigos_filtrados
+                    )
+                }
+
+                proximo_codigo = max(
+                    contagens,
+                    key=contagens.get
+                )
+
+        # =========================================
+        # FALLBACK
+        # =========================================
+
+        if not proximo_codigo:
+
+            for _, cor, codigo in reversed(
+                historico_codigos
+            ):
+
+                if cor == cor_prevista:
+
+                    proximo_codigo = codigo
+                    break
 
         print(
-            f"🔎 Janela: {janela_atual}"
+            f"🔎 Janela Cores: "
+            f"{janela_atual_cores}"
         )
 
         print(
-            f"📊 Próximos: {proximos}"
+            f"📊 Próximas cores: "
+            f"{proximas_cores}"
         )
 
         print(
-            f"✅ Previsão: "
-            f"{proximo_codigo} | "
-            f"{proxima_cor} | "
+            f"🎯 Cor prevista: "
+            f"{cor_prevista}"
+        )
+
+        print(
+            f"🖼️ Código previsto: "
+            f"{proximo_codigo}"
+        )
+
+        print(
+            f"✅ Confiança: "
             f"{confianca:.2%}"
         )
 
         return (
             proximo_codigo,
-            proxima_cor,
+            cor_prevista,
             confianca
         )
 
@@ -779,7 +1087,7 @@ def calcular_previsao_exata(
         )
 
         return None
-
+    
 # ========================
 # LEITURA DAS APOSTAS
 # ========================
@@ -947,7 +1255,7 @@ SITE_URL = "https://www.pa3333.com/?cur=game"
 historico_apostas = []
 
 
-def extrair_valor_total(texto):
+def extrair_valor(texto):
 
     try:
 
@@ -962,11 +1270,8 @@ def extrair_valor_total(texto):
                 match.group(1)
             )
 
-    except Exception as e:
-
-        print(
-            f"❌ Erro extrair valor: {e}"
-        )
+    except Exception:
+        pass
 
     return 0.0
 
@@ -995,25 +1300,21 @@ def pegar_valores_apostas():
 
             return None
 
-        html = resp.text
-
         soup = BeautifulSoup(
-            html,
+            resp.text,
             "html.parser"
         )
 
-        # =========================================
-        # IDENTIFICA BLOCO AZUL
-        # =========================================
+        # =====================================
+        # IDENTIFICA EXATAMENTE PELO data-type
+        # =====================================
+
         bloco_azul = soup.find(
             attrs={
                 "data-type": "blue"
             }
         )
 
-        # =========================================
-        # IDENTIFICA BLOCO VERMELHO
-        # =========================================
         bloco_vermelho = soup.find(
             attrs={
                 "data-type": "red"
@@ -1023,7 +1324,7 @@ def pegar_valores_apostas():
         if not bloco_azul:
 
             print(
-                "⚠️ Não encontrou apostas AZUL"
+                "⚠️ Não encontrou apostas AZUL."
             )
 
             return None
@@ -1031,42 +1332,38 @@ def pegar_valores_apostas():
         if not bloco_vermelho:
 
             print(
-                "⚠️ Não encontrou apostas VERMELHO"
+                "⚠️ Não encontrou apostas VERMELHO."
             )
 
             return None
 
-        # =========================================
+        # =====================================
         # EXTRAI TEXO DOS BLOCOS
-        # =========================================
+        # =====================================
+
         texto_azul = bloco_azul.get_text(
-            separator=" ",
+            " ",
             strip=True
         )
 
         texto_vermelho = bloco_vermelho.get_text(
-            separator=" ",
+            " ",
             strip=True
         )
 
-        # =========================================
-        # PEGA TOTAL:R$
-        # =========================================
-        valor_azul = extrair_valor_total(
+        # =====================================
+        # EXTRAI TOTAL:R$
+        # =====================================
+
+        azul = extrair_valor(
             texto_azul
         )
 
-        valor_vermelho = extrair_valor_total(
+        vermelho = extrair_valor(
             texto_vermelho
         )
 
-        # =========================================
-        # VALIDAÇÃO
-        # =========================================
-        if (
-            valor_azul <= 0 and
-            valor_vermelho <= 0
-        ):
+        if azul <= 0 and vermelho <= 0:
 
             print(
                 "⚠️ Valores inválidos."
@@ -1075,12 +1372,12 @@ def pegar_valores_apostas():
             return None
 
         diferenca = abs(
-            valor_azul - valor_vermelho
+            azul - vermelho
         )
 
         resultado = {
-            "azul": valor_azul,
-            "vermelho": valor_vermelho,
+            "azul": azul,
+            "vermelho": vermelho,
             "diferenca": diferenca,
             "timestamp": datetime.now()
         }
@@ -1089,14 +1386,14 @@ def pegar_valores_apostas():
             resultado
         )
 
-        # mantém últimos 200 ciclos
-        historico_apostas[:] = (
-            historico_apostas[-200:]
-        )
+        # mantém histórico leve
+        if len(historico_apostas) > 300:
+
+            historico_apostas.pop(0)
 
         print(
-            f"💰 AZUL={valor_azul} | "
-            f"VERMELHO={valor_vermelho} | "
+            f"💰 AZUL={azul} | "
+            f"VERMELHO={vermelho} | "
             f"DIF={diferenca}"
         )
 
@@ -1106,6 +1403,277 @@ def pegar_valores_apostas():
 
         print(
             f"❌ Erro apostas: {e}"
+        )
+
+        return None
+
+
+# ========================
+# PREVISÃO POR APOSTAS (IA ADAPTATIVA)
+# ========================
+
+def calcular_pressao_apostas():
+
+    if len(historico_apostas) < 15:
+
+        print(
+            "⚠️ Histórico apostas insuficiente."
+        )
+
+        return None
+
+    try:
+
+        # =========================================
+        # ANALISA SOMENTE OS ÚLTIMOS 15 CICLOS
+        # =========================================
+        ultimos = historico_apostas[-15:]
+
+        score_azul = 0
+        score_vermelho = 0
+
+        ciclos_inversao_azul = 0
+        ciclos_inversao_vermelho = 0
+
+        repeticao_azul = 0
+        repeticao_vermelho = 0
+
+        tendencia_azul = 0
+        tendencia_vermelho = 0
+
+        diferencas = []
+
+        # =========================================
+        # IA ANALISA PADRÃO DA PLATAFORMA
+        # =========================================
+        for i, item in enumerate(ultimos):
+
+            azul = item["azul"]
+            vermelho = item["vermelho"]
+
+            diferenca = abs(
+                azul - vermelho
+            )
+
+            diferencas.append(
+                diferenca
+            )
+
+            # =====================================
+            # DETECTA LADO COM MAIOR PRESSÃO
+            # =====================================
+            if azul > vermelho:
+
+                repeticao_azul += 1
+
+                # plataforma tende quebrar maioria
+                score_vermelho += 1.4
+
+                if diferenca >= 300:
+                    score_vermelho += 1
+
+                if diferenca >= 700:
+                    score_vermelho += 2
+
+                tendencia_azul += diferenca
+
+            else:
+
+                repeticao_vermelho += 1
+
+                score_azul += 1.4
+
+                if diferenca >= 300:
+                    score_azul += 1
+
+                if diferenca >= 700:
+                    score_azul += 2
+
+                tendencia_vermelho += diferenca
+
+            # =====================================
+            # IA DETECTA INVERSÕES
+            # =====================================
+            if i >= 1:
+
+                anterior = ultimos[i - 1]
+
+                azul_ant = anterior["azul"]
+                vermelho_ant = anterior["vermelho"]
+
+                # explosão azul
+                if (
+                    azul >
+                    azul_ant * 1.8
+                ):
+
+                    ciclos_inversao_azul += 1
+
+                    score_vermelho += 1.5
+
+                # explosão vermelho
+                if (
+                    vermelho >
+                    vermelho_ant * 1.8
+                ):
+
+                    ciclos_inversao_vermelho += 1
+
+                    score_azul += 1.5
+
+        # =========================================
+        # MÉDIA DAS DIFERENÇAS
+        # =========================================
+        media_diferenca = (
+            sum(diferencas)
+            / len(diferencas)
+        )
+
+        # =========================================
+        # DETECTA DOMÍNIO
+        # =========================================
+        if repeticao_azul >= 10:
+
+            score_vermelho += 3
+
+        if repeticao_vermelho >= 10:
+
+            score_azul += 3
+
+        # =========================================
+        # DETECTA TENDÊNCIA
+        # =========================================
+        if tendencia_azul > tendencia_vermelho:
+
+            score_vermelho += 2
+
+        elif tendencia_vermelho > tendencia_azul:
+
+            score_azul += 2
+
+        # =========================================
+        # DETECTA ARMADILHA
+        # =========================================
+        ultimo = ultimos[-1]
+
+        azul_final = ultimo["azul"]
+        vermelho_final = ultimo["vermelho"]
+
+        diferenca_final = abs(
+            azul_final - vermelho_final
+        )
+
+        if diferenca_final >= (
+            media_diferenca * 2
+        ):
+
+            if azul_final > vermelho_final:
+
+                score_vermelho += 4
+
+                print(
+                    "🧠 IA detectou armadilha AZUL"
+                )
+
+            else:
+
+                score_azul += 4
+
+                print(
+                    "🧠 IA detectou armadilha VERMELHO"
+                )
+
+        # =========================================
+        # NORMALIZA
+        # =========================================
+        total = (
+            score_azul +
+            score_vermelho
+        )
+
+        if total <= 0:
+
+            print(
+                "⚠️ Sem força suficiente."
+            )
+
+            return None
+
+        confianca_azul = (
+            score_azul / total
+        )
+
+        confianca_vermelho = (
+            score_vermelho / total
+        )
+
+        # =========================================
+        # LOG DETALHADO
+        # =========================================
+        print(
+            f"📊 SCORE -> "
+            f"AZUL:{score_azul:.2f} | "
+            f"VERMELHO:{score_vermelho:.2f}"
+        )
+
+        print(
+            f"📈 REPETIÇÕES -> "
+            f"AZUL:{repeticao_azul} | "
+            f"VERMELHO:{repeticao_vermelho}"
+        )
+
+        print(
+            f"🔄 INVERSÕES -> "
+            f"AZUL:{ciclos_inversao_azul} | "
+            f"VERMELHO:{ciclos_inversao_vermelho}"
+        )
+
+        print(
+            f"📉 MÉDIA DIFERENÇA -> "
+            f"{media_diferenca:.2f}"
+        )
+
+        # =========================================
+        # DECISÃO FINAL
+        # =========================================
+        if confianca_azul >= 0.60:
+
+            print(
+                f"🤖 IA escolheu AZUL "
+                f"({confianca_azul:.1%})"
+            )
+
+            return {
+                "cor": "AZUL",
+                "forca": score_azul,
+                "confianca": confianca_azul,
+                "modelo": "IA_ADAPTATIVA"
+            }
+
+        if confianca_vermelho >= 0.60:
+
+            print(
+                f"🤖 IA escolheu VERMELHO "
+                f"({confianca_vermelho:.1%})"
+            )
+
+            return {
+                "cor": "VERMELHO",
+                "forca": score_vermelho,
+                "confianca": confianca_vermelho,
+                "modelo": "IA_ADAPTATIVA"
+            }
+
+        print(
+            "⚠️ IA sem confiança suficiente."
+        )
+
+        return None
+
+    except Exception as e:
+
+        print(
+            f"❌ Erro pressão apostas: {e}"
         )
 
         return None

@@ -45,7 +45,7 @@ from sequencias import (
 # ================= CONFIGURAÇÕES =================
 BOT_TOKEN = "5965310119:AAFbNw-r1UgaqMkDn0Ivx4-j-HBPgCKQgFU"
 
-CHAT_ID = "-4662928533"
+CHAT_ID = "-1003937478657"
 
 request = HTTPXRequest(
     connect_timeout=30,
