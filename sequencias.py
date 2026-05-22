@@ -780,283 +780,332 @@ def calcular_previsao_exata(
 
         return None
 
-
 # ========================
-# PREVISÃO POR APOSTAS (IA ADAPTATIVA)
+# LEITURA DAS APOSTAS
 # ========================
 
-def calcular_pressao_apostas():
+SITE_URL = "https://www.pa3333.com/?cur=game"
 
-    if len(historico_apostas) < 15:
+historico_apostas = []
 
-        print(
-            "⚠️ Histórico apostas insuficiente."
-        )
 
-        return None
+def extrair_valor_total(texto):
 
     try:
 
-        # =========================================
-        # ANALISA SOMENTE OS ÚLTIMOS 15 CICLOS
-        # =========================================
-        ultimos = historico_apostas[-15:]
+        match = re.search(
+            r"TOTAL:R\$([\d\.]+)",
+            texto
+        )
 
-        score_azul = 0
-        score_vermelho = 0
+        if match:
 
-        ciclos_inversao_azul = 0
-        ciclos_inversao_vermelho = 0
-
-        repeticao_azul = 0
-        repeticao_vermelho = 0
-
-        tendencia_azul = 0
-        tendencia_vermelho = 0
-
-        diferencas = []
-
-        # =========================================
-        # IA ANALISA PADRÃO DA PLATAFORMA
-        # =========================================
-        for i, item in enumerate(ultimos):
-
-            azul = item["azul"]
-            vermelho = item["vermelho"]
-
-            diferenca = abs(
-                azul - vermelho
+            return float(
+                match.group(1)
             )
 
-            diferencas.append(
-                diferenca
+    except Exception:
+        pass
+
+    return 0.0
+
+
+def pegar_valores_apostas():
+
+    try:
+
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 "
+                "(Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 "
+                "(KHTML, like Gecko) "
+                "Chrome/122.0 Safari/537.36"
             )
+        }
 
-            # =====================================
-            # DETECTA LADO COM MAIOR PRESSÃO
-            # =====================================
-            if azul > vermelho:
-
-                repeticao_azul += 1
-
-                # ===============================
-                # Plataforma normalmente tenta
-                # quebrar maioria
-                # ===============================
-                score_vermelho += 1.4
-
-                # ===============================
-                # pressão extrema
-                # ===============================
-                if diferenca >= 300:
-                    score_vermelho += 1
-
-                if diferenca >= 700:
-                    score_vermelho += 2
-
-                # ===============================
-                # tendência crescente
-                # ===============================
-                tendencia_azul += diferenca
-
-            else:
-
-                repeticao_vermelho += 1
-
-                score_azul += 1.4
-
-                if diferenca >= 300:
-                    score_azul += 1
-
-                if diferenca >= 700:
-                    score_azul += 2
-
-                tendencia_vermelho += diferenca
-
-            # =====================================
-            # IA DETECTA INVERSÕES
-            # =====================================
-            if i >= 1:
-
-                anterior = ultimos[i - 1]
-
-                azul_ant = anterior["azul"]
-                vermelho_ant = anterior["vermelho"]
-
-                # mudança brusca azul
-                if (
-                    azul > azul_ant * 1.8
-                ):
-
-                    ciclos_inversao_azul += 1
-
-                    score_vermelho += 1.5
-
-                # mudança brusca vermelho
-                if (
-                    vermelho > vermelho_ant * 1.8
-                ):
-
-                    ciclos_inversao_vermelho += 1
-
-                    score_azul += 1.5
-
-        # =========================================
-        # MÉDIA DAS DIFERENÇAS
-        # =========================================
-        media_diferenca = (
-            sum(diferencas)
-            / len(diferencas)
+        resp = requests.get(
+            SITE_URL,
+            headers=headers,
+            timeout=20
         )
 
-        # =========================================
-        # DETECTA DOMÍNIO DE UM LADO
-        # =========================================
-        if repeticao_azul >= 10:
-
-            score_vermelho += 3
-
-        if repeticao_vermelho >= 10:
-
-            score_azul += 3
-
-        # =========================================
-        # DETECTA PADRÃO DE MANIPULAÇÃO
-        # =========================================
-        if tendencia_azul > tendencia_vermelho:
-
-            score_vermelho += 2
-
-        elif tendencia_vermelho > tendencia_azul:
-
-            score_azul += 2
-
-        # =========================================
-        # IA DETECTA MERCADO "ARMADILHA"
-        # =========================================
-        ultimo = ultimos[-1]
-
-        azul_final = ultimo["azul"]
-        vermelho_final = ultimo["vermelho"]
-
-        diferenca_final = abs(
-            azul_final - vermelho_final
-        )
-
-        # entrada gigante em um lado
-        # normalmente plataforma quebra
-
-        if diferenca_final >= (
-            media_diferenca * 2
-        ):
-
-            if azul_final > vermelho_final:
-
-                score_vermelho += 4
-
-                print(
-                    "🧠 IA detectou armadilha AZUL"
-                )
-
-            else:
-
-                score_azul += 4
-
-                print(
-                    "🧠 IA detectou armadilha VERMELHO"
-                )
-
-        # =========================================
-        # NORMALIZA CONFIANÇA
-        # =========================================
-        total = (
-            score_azul +
-            score_vermelho
-        )
-
-        if total <= 0:
+        if resp.status_code != 200:
 
             print(
-                "⚠️ Sem força suficiente."
+                f"⚠️ Falha carregar página: "
+                f"{resp.status_code}"
             )
 
             return None
 
-        confianca_azul = (
-            score_azul / total
-        )
-
-        confianca_vermelho = (
-            score_vermelho / total
+        soup = BeautifulSoup(
+            resp.text,
+            "html.parser"
         )
 
         # =========================================
-        # LOG DETALHADO
+        # BLOCO AZUL
         # =========================================
-        print(
-            f"📊 SCORE -> "
-            f"AZUL:{score_azul:.2f} | "
-            f"VERMELHO:{score_vermelho:.2f}"
-        )
-
-        print(
-            f"📈 REPETIÇÕES -> "
-            f"AZUL:{repeticao_azul} | "
-            f"VERMELHO:{repeticao_vermelho}"
-        )
-
-        print(
-            f"🔄 INVERSÕES -> "
-            f"AZUL:{ciclos_inversao_azul} | "
-            f"VERMELHO:{ciclos_inversao_vermelho}"
-        )
-
-        print(
-            f"📉 MÉDIA DIFERENÇA -> "
-            f"{media_diferenca:.2f}"
+        bloco_azul = soup.find(
+            attrs={
+                "data-type": "blue"
+            }
         )
 
         # =========================================
-        # DECISÃO FINAL DA IA
+        # BLOCO VERMELHO
         # =========================================
-        if confianca_azul >= 0.60:
+        bloco_vermelho = soup.find(
+            attrs={
+                "data-type": "red"
+            }
+        )
+
+        if not bloco_azul or not bloco_vermelho:
 
             print(
-                f"🤖 IA escolheu AZUL "
-                f"({confianca_azul:.1%})"
+                "⚠️ Não encontrou apostas."
             )
 
-            return {
-                "cor": "AZUL",
-                "forca": score_azul,
-                "confianca": confianca_azul,
-                "modelo": "IA_ADAPTATIVA"
-            }
+            return None
 
-        if confianca_vermelho >= 0.60:
-
-            print(
-                f"🤖 IA escolheu VERMELHO "
-                f"({confianca_vermelho:.1%})"
-            )
-
-            return {
-                "cor": "VERMELHO",
-                "forca": score_vermelho,
-                "confianca": confianca_vermelho,
-                "modelo": "IA_ADAPTATIVA"
-            }
-
-        print(
-            "⚠️ IA sem confiança suficiente."
+        texto_azul = bloco_azul.get_text(
+            " ",
+            strip=True
         )
 
-        return None
+        texto_vermelho = bloco_vermelho.get_text(
+            " ",
+            strip=True
+        )
+
+        azul = extrair_valor_total(
+            texto_azul
+        )
+
+        vermelho = extrair_valor_total(
+            texto_vermelho
+        )
+
+        if azul <= 0 and vermelho <= 0:
+
+            print(
+                "⚠️ Valores inválidos."
+            )
+
+            return None
+
+        diferenca = abs(
+            azul - vermelho
+        )
+
+        resultado = {
+
+            "azul": azul,
+
+            "vermelho": vermelho,
+
+            "diferenca": diferenca,
+
+            "timestamp": datetime.now()
+        }
+
+        historico_apostas.append(
+            resultado
+        )
+
+        # mantém últimos 100 ciclos
+        historico_apostas[:] = (
+            historico_apostas[-100:]
+        )
+
+        print(
+            f"💰 APOSTAS -> "
+            f"AZUL:R${azul} | "
+            f"VERMELHO:R${vermelho} | "
+            f"DIF:R${diferenca}"
+        )
+
+        return resultado
 
     except Exception as e:
 
         print(
-            f"❌ Erro pressão apostas: {e}"
+            f"❌ Erro apostas: {e}"
+        )
+
+        return None
+
+
+# ========================
+# LEITURA DAS APOSTAS
+# ========================
+
+SITE_URL = "https://www.pa3333.com/?cur=game"
+
+historico_apostas = []
+
+
+def extrair_valor_total(texto):
+
+    try:
+
+        match = re.search(
+            r"TOTAL:R\$([\d\.]+)",
+            texto
+        )
+
+        if match:
+
+            return float(
+                match.group(1)
+            )
+
+    except Exception as e:
+
+        print(
+            f"❌ Erro extrair valor: {e}"
+        )
+
+    return 0.0
+
+
+def pegar_valores_apostas():
+
+    try:
+
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0"
+            )
+        }
+
+        resp = requests.get(
+            SITE_URL,
+            headers=headers,
+            timeout=15
+        )
+
+        if resp.status_code != 200:
+
+            print(
+                "⚠️ Falha carregar página."
+            )
+
+            return None
+
+        html = resp.text
+
+        soup = BeautifulSoup(
+            html,
+            "html.parser"
+        )
+
+        # =========================================
+        # IDENTIFICA BLOCO AZUL
+        # =========================================
+        bloco_azul = soup.find(
+            attrs={
+                "data-type": "blue"
+            }
+        )
+
+        # =========================================
+        # IDENTIFICA BLOCO VERMELHO
+        # =========================================
+        bloco_vermelho = soup.find(
+            attrs={
+                "data-type": "red"
+            }
+        )
+
+        if not bloco_azul:
+
+            print(
+                "⚠️ Não encontrou apostas AZUL"
+            )
+
+            return None
+
+        if not bloco_vermelho:
+
+            print(
+                "⚠️ Não encontrou apostas VERMELHO"
+            )
+
+            return None
+
+        # =========================================
+        # EXTRAI TEXO DOS BLOCOS
+        # =========================================
+        texto_azul = bloco_azul.get_text(
+            separator=" ",
+            strip=True
+        )
+
+        texto_vermelho = bloco_vermelho.get_text(
+            separator=" ",
+            strip=True
+        )
+
+        # =========================================
+        # PEGA TOTAL:R$
+        # =========================================
+        valor_azul = extrair_valor_total(
+            texto_azul
+        )
+
+        valor_vermelho = extrair_valor_total(
+            texto_vermelho
+        )
+
+        # =========================================
+        # VALIDAÇÃO
+        # =========================================
+        if (
+            valor_azul <= 0 and
+            valor_vermelho <= 0
+        ):
+
+            print(
+                "⚠️ Valores inválidos."
+            )
+
+            return None
+
+        diferenca = abs(
+            valor_azul - valor_vermelho
+        )
+
+        resultado = {
+            "azul": valor_azul,
+            "vermelho": valor_vermelho,
+            "diferenca": diferenca,
+            "timestamp": datetime.now()
+        }
+
+        historico_apostas.append(
+            resultado
+        )
+
+        # mantém últimos 200 ciclos
+        historico_apostas[:] = (
+            historico_apostas[-200:]
+        )
+
+        print(
+            f"💰 AZUL={valor_azul} | "
+            f"VERMELHO={valor_vermelho} | "
+            f"DIF={diferenca}"
+        )
+
+        return resultado
+
+    except Exception as e:
+
+        print(
+            f"❌ Erro apostas: {e}"
         )
 
         return None
