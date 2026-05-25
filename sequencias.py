@@ -561,7 +561,9 @@ def horarios_sao_consecutivos(historico):
 
 def calcular_previsao_exata_por_cor(
     historico_cores,
-    caminho_seq='seq.csv'
+    caminho_seq='seq.csv',
+    caminho_resultados='resultados.csv',
+    caminho_sequencias='sequencias.csv'
 ):
 
     if len(historico_cores) < 5:
@@ -611,6 +613,145 @@ def calcular_previsao_exata_por_cor(
 
         return None
 
+    # ==========================================
+    # CONTROLE DE TENDÊNCIA
+    # ==========================================
+
+    modo_analise = "CONTRA"
+
+    total_win = 0
+    total_loss = 0
+
+    try:
+
+        if os.path.exists(caminho_resultados):
+
+            with open(
+                caminho_resultados,
+                'r',
+                encoding='utf-8'
+            ) as f:
+
+                leitor = csv.reader(f)
+
+                next(leitor, None)
+
+                for linha in leitor:
+
+                    linha_texto = (
+                        ",".join(linha)
+                    ).upper()
+
+                    if (
+                        "WIN" in linha_texto
+                    ):
+
+                        total_win += 1
+
+                    elif (
+                        "LOSS" in linha_texto
+                    ):
+
+                        total_loss += 1
+
+        print(
+            f"📊 WIN: {total_win} | LOSS: {total_loss}"
+        )
+
+        # ==========================================
+        # REGRA:
+        # SE LOSS > WIN = IR A FAVOR
+        # SENÃO = IR CONTRA
+        # ==========================================
+
+        if total_loss > total_win:
+
+            modo_analise = "FAVOR"
+
+        else:
+
+            modo_analise = "CONTRA"
+
+        print(
+            f"🧠 Modo análise atual: {modo_analise}"
+        )
+
+    except Exception as e:
+
+        print(
+            f"❌ Erro ao analisar resultados.csv: {e}"
+        )
+
+    # ==========================================
+    # VERIFICA TROCA DE HORA
+    # 13:00, 14:00, 15:00...
+    # ==========================================
+
+    try:
+
+        if os.path.exists(caminho_sequencias):
+
+            with open(
+                caminho_sequencias,
+                'r',
+                encoding='utf-8'
+            ) as f:
+
+                leitor = csv.DictReader(f)
+
+                linhas = list(leitor)
+
+            if linhas:
+
+                ultimo = linhas[-1]
+
+                timestamp_str = (
+                    ultimo["Timestamp"]
+                )
+
+                data_obj = datetime.strptime(
+                    timestamp_str,
+                    "%Y-%m-%d %H:%M:%S"
+                )
+
+                minuto = data_obj.minute
+
+                # ==========================================
+                # CONFERE A CADA HORA CHEIA
+                # ==========================================
+
+                if minuto == 0:
+
+                    print(
+                        "⏰ Virada de hora detectada."
+                    )
+
+                    print(
+                        "🔄 Reavaliando tendência..."
+                    )
+
+                    if total_loss > total_win:
+
+                        modo_analise = "FAVOR"
+
+                    else:
+
+                        modo_analise = "CONTRA"
+
+                    print(
+                        f"🎯 Novo modo: {modo_analise}"
+                    )
+
+    except Exception as e:
+
+        print(
+            f"❌ Erro ao verificar sequencias.csv: {e}"
+        )
+
+    # ==========================================
+    # BUSCA SEQUÊNCIA
+    # ==========================================
+
     for entrada, saida in sequencias_fixas:
 
         janela = len(entrada)
@@ -634,30 +775,41 @@ def calcular_previsao_exata_por_cor(
                 saida.upper()
             )
 
-            # =========================
-            # AJUSTE:
-            # INVERTE O PADRÃO
-            # =========================
+            # ==========================================
+            # MODO FAVOR
+            # ==========================================
 
-            if (
-                previsao_original
-                == "AZUL"
-            ):
-
-                previsao = "VERMELHO"
-
-            elif (
-                previsao_original
-                == "VERMELHO"
-            ):
-
-                previsao = "AZUL"
-
-            else:
+            if modo_analise == "FAVOR":
 
                 previsao = (
                     previsao_original
                 )
+
+            # ==========================================
+            # MODO CONTRA
+            # ==========================================
+
+            else:
+
+                if (
+                    previsao_original
+                    == "AZUL"
+                ):
+
+                    previsao = "VERMELHO"
+
+                elif (
+                    previsao_original
+                    == "VERMELHO"
+                ):
+
+                    previsao = "AZUL"
+
+                else:
+
+                    previsao = (
+                        previsao_original
+                    )
 
             print(
                 f"✅ Sequência encontrada: "
@@ -665,12 +817,17 @@ def calcular_previsao_exata_por_cor(
             )
 
             print(
-                f"🔄 Padrão original: "
+                f"🔍 Padrão original: "
                 f"{previsao_original}"
             )
 
             print(
-                f"🎯 Contrapadrão: "
+                f"📈 Modo análise: "
+                f"{modo_analise}"
+            )
+
+            print(
+                f"🎯 Previsão final: "
                 f"{previsao}"
             )
 
@@ -690,7 +847,7 @@ def calcular_previsao_exata(
     historico_codigos
 ):
 
-    if len(historico_codigos) < 12:
+    if len(historico_codigos) < 10:
 
         print(
             "⚠️ Histórico insuficiente por código."
@@ -871,9 +1028,7 @@ def calcular_previsao_exata(
         )
 
         # =====================================
-        # AJUSTE:
         # EVITA FALSO PADRÃO
-        # COM POUCOS DADOS
         # =====================================
 
         if len(proximas_cores) < 3:
@@ -897,14 +1052,18 @@ def calcular_previsao_exata(
 
         total = len(proximas_cores)
 
-        cor_prevista = max(
+        # =====================================
+        # PEGA COR DOMINANTE
+        # =====================================
+
+        cor_dominante = max(
             contagem_cores,
             key=contagem_cores.get
         )
 
         maior_contagem = (
             contagem_cores[
-                cor_prevista
+                cor_dominante
             ]
         )
 
@@ -913,7 +1072,6 @@ def calcular_previsao_exata(
         )
 
         # =====================================
-        # AJUSTE:
         # EVITA ENTRADA FRACA
         # =====================================
 
@@ -927,8 +1085,7 @@ def calcular_previsao_exata(
             return None
 
         # =====================================
-        # AJUSTE:
-        # EVITA EMPATE ESCONDIDO
+        # EVITA EMPATE
         # =====================================
 
         candidatos = [
@@ -948,6 +1105,19 @@ def calcular_previsao_exata(
             )
 
             return None
+
+        # =====================================
+        # AJUSTE PRINCIPAL:
+        # INVERTE A ENTRADA
+        # =====================================
+
+        if cor_dominante == "AZUL":
+
+            cor_prevista = "VERMELHO"
+
+        else:
+
+            cor_prevista = "AZUL"
 
         # =========================================
         # PREVISÃO POR CÓDIGO
@@ -1004,6 +1174,10 @@ def calcular_previsao_exata(
                     )
                 )
 
+                # =====================================
+                # FILTRA PELA COR INVERTIDA
+                # =====================================
+
                 if (
                     cor_codigo
                     == cor_prevista
@@ -1059,13 +1233,13 @@ def calcular_previsao_exata(
         )
 
         print(
-            f"🎯 Cor prevista: "
-            f"{cor_prevista}"
+            f"🎯 Cor dominante: "
+            f"{cor_dominante}"
         )
 
         print(
-            f"🖼️ Código previsto: "
-            f"{proximo_codigo}"
+            f"🔄 Entrada invertida: "
+            f"{cor_prevista}"
         )
 
         print(

@@ -378,7 +378,6 @@ async def enviar_resultado(acertou):
     except Exception as e:
         print(f"⚠️ Erro sticker: {e}")
 
-
 # =========================================================
 # RELATÓRIO
 # =========================================================
@@ -386,20 +385,188 @@ async def enviar_relatorio():
 
     global resultados
 
-    if not resultados:
-        return
+    arquivo_resultados = "resultados.csv"
 
-    wins = sum(
-        1 for _, _, w in resultados if w
-    )
+    # =====================================================
+    # CRIAR CSV CASO NÃO EXISTA
+    # =====================================================
 
-    losses = len(resultados) - wins
+    if not os.path.exists(arquivo_resultados):
+
+        with open(
+            arquivo_resultados,
+            "w",
+            newline="",
+            encoding="utf-8"
+        ) as f:
+
+            writer = csv.writer(f)
+
+            writer.writerow([
+                "Timestamp",
+                "Cor",
+                "Horario",
+                "Resultado"
+            ])
+
+    # =====================================================
+    # ZERAR RESULTADOS A CADA HORA
+    # =====================================================
+
+    agora = datetime.now()
+
+    hora_atual = agora.strftime("%Y-%m-%d %H")
+
+    try:
+
+        with open(
+            arquivo_resultados,
+            "r",
+            encoding="utf-8"
+        ) as f:
+
+            leitor = csv.reader(f)
+
+            linhas_csv = list(leitor)
+
+        # =================================================
+        # VERIFICA TROCA DE HORA
+        # =================================================
+
+        if len(linhas_csv) > 1:
+
+            ultima_hora_csv = (
+                linhas_csv[-1][0][:13]
+            )
+
+            if ultima_hora_csv != hora_atual:
+
+                with open(
+                    arquivo_resultados,
+                    "w",
+                    newline="",
+                    encoding="utf-8"
+                ) as f:
+
+                    writer = csv.writer(f)
+
+                    writer.writerow([
+                        "Timestamp",
+                        "Cor",
+                        "Horario",
+                        "Resultado"
+                    ])
+
+                print(
+                    f"🗑️ resultados.csv resetado "
+                    f"às {hora_atual}:00"
+                )
+
+    except Exception as e:
+
+        print(
+            f"⚠️ Erro reset CSV: {e}"
+        )
+
+    # =====================================================
+    # SALVAR RESULTADOS
+    # =====================================================
+
+    try:
+
+        with open(
+            arquivo_resultados,
+            "a",
+            newline="",
+            encoding="utf-8"
+        ) as f:
+
+            writer = csv.writer(f)
+
+            for cor, horario, win in resultados:
+
+                resultado_texto = (
+                    "WIN"
+                    if win
+                    else "LOSS"
+                )
+
+                writer.writerow([
+                    datetime.now().strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    ),
+                    cor,
+                    horario,
+                    resultado_texto
+                ])
+
+                print(
+                    f"💾 Resultado salvo: "
+                    f"{resultado_texto}"
+                )
+
+    except Exception as e:
+
+        print(
+            f"⚠️ Erro salvando CSV: {e}"
+        )
+
+    # =====================================================
+    # CONTAGEM REAL DIRETO DO CSV
+    # =====================================================
+
+    wins = 0
+    losses = 0
+
+    try:
+
+        with open(
+            arquivo_resultados,
+            "r",
+            encoding="utf-8"
+        ) as f:
+
+            leitor = csv.DictReader(f)
+
+            for linha in leitor:
+
+                resultado = (
+                    linha["Resultado"]
+                    .strip()
+                    .upper()
+                )
+
+                if resultado == "WIN":
+
+                    wins += 1
+
+                elif resultado == "LOSS":
+
+                    losses += 1
+
+        print(
+            f"📊 WIN: {wins} | LOSS: {losses}"
+        )
+
+    except Exception as e:
+
+        print(
+            f"⚠️ Erro lendo CSV: {e}"
+        )
+
+    # =====================================================
+    # RELATÓRIO VISUAL
+    # =====================================================
 
     linhas = []
 
     for cor, horario, win in resultados:
 
-        simbolo = "✅" if win else "❌"
+        simbolo = (
+            "✅"
+            if win
+            else "❌"
+        )
 
         cor_icon = (
             "🔵"
@@ -408,7 +575,8 @@ async def enviar_relatorio():
         )
 
         linhas.append(
-            f"{cor_icon} {cor:<8} {horario} ➧ {simbolo}"
+            f"{cor_icon} {cor:<8} "
+            f"{horario} ➧ {simbolo}"
         )
 
     relatorio = (
@@ -423,12 +591,12 @@ async def enviar_relatorio():
 
         f"✅ WINS: {wins}\n"
         f"❌ LOSS: {losses}\n\n"
-        
+
         " 🚀 Enquanto muitos estão testando \n"
         "sorte, aqui é resultado com estratégia!\n"
         "💹 Se ainda está só assistindo de fora… \n"
         "tá esperando o quê?\n\n"
-        
+
         "🎯 plataforma PAPA JOGO https://pa3333.com/?invite_code=UPJCSWGP\n"
         "receba sinais FREE, Suporte @souza999br\n"
     )
@@ -443,9 +611,17 @@ async def enviar_relatorio():
         print("📊 Relatório enviado!")
 
     except Exception as e:
-        print(f"⚠️ Relatório erro: {e}")
 
+        print(
+            f"⚠️ Relatório erro: {e}"
+        )
 
+    # =====================================================
+    # LIMPA MEMÓRIA
+    # =====================================================
+
+    resultados.clear()
+    
 # =========================================================
 # RESET
 # =========================================================
@@ -740,7 +916,7 @@ async def loop_previsoes():
             proximo = (
                 agora + timedelta(minutes=1)
             ).replace(
-                second=57,
+                second=15,
                 microsecond=0
             )
 
@@ -809,6 +985,9 @@ if __name__ == "__main__":
 
     try:
 
+        # =========================================
+        # SEQ_HIST_FILE
+        # =========================================
         with open(
             SEQ_HIST_FILE,
             "w",
@@ -824,11 +1003,47 @@ if __name__ == "__main__":
                 "Codigo"
             ])
 
-        print(
-            f"📂 {SEQ_HIST_FILE} resetado!"
-        )
+        # =========================================
+        # RESULTADOS.CSV
+        # =========================================
+        with open(
+            "resultados.csv",
+            "w",
+            newline="",
+            encoding="utf-8"
+        ) as f:
+
+            writer = csv.writer(f)
+
+            writer.writerow([
+                "Timestamp",
+                "Cor",
+                "Horario",
+                "Resultado"
+            ])
+
+        # =========================================
+        # SEQUENCIAS.CSV
+        # =========================================
+        with open(
+            "sequencias.csv",
+            "w",
+            newline="",
+            encoding="utf-8"
+        ) as f:
+
+            writer = csv.writer(f)
+
+            writer.writerow([
+                "Timestamp",
+                "Cor",
+                "Codigo"
+            ])
+
+        print("📂 CSVs resetados!")
 
     except Exception as e:
+
         print(f"⚠️ Erro CSV: {e}")
 
     asyncio.run(main())
