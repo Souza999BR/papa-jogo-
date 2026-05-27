@@ -660,6 +660,7 @@ async def loop_previsoes():
     global resultados
     global ultima_hora_reset
     global historico_tendencia
+    global ultima_hora_relatorio
 
     print("🚀 Sistema iniciado!")
 
@@ -679,6 +680,21 @@ async def loop_previsoes():
 
                 await resetar_bot()
 
+            # ================= RELATÓRIO POR HORA =================
+            if "ultima_hora_relatorio" not in globals():
+                ultima_hora_relatorio = agora.hour
+
+            if agora.hour != ultima_hora_relatorio:
+
+                print(f"📊 Enviando relatório da hora {ultima_hora_relatorio:02d}...")
+
+                if resultados:
+
+                    await enviar_relatorio()
+                    resultados.clear()
+
+                ultima_hora_relatorio = agora.hour
+
             # =====================================================
             # COLETA FINAL DAS APOSTAS (57~59 SEGUNDOS)
             # =====================================================
@@ -696,29 +712,21 @@ async def loop_previsoes():
             if not resultado:
 
                 await asyncio.sleep(5)
-
                 continue
 
             cor_atual, codigo_atual = resultado
 
-            if cor_atual not in [
-                "AZUL",
-                "VERMELHO"
-            ]:
+            if cor_atual not in ["AZUL", "VERMELHO"]:
 
                 await asyncio.sleep(5)
-
                 continue
 
-            salvar_historico(
-                cor_atual,
-                codigo_atual
-            )
+            salvar_historico(cor_atual, codigo_atual)
 
             # ================= HISTÓRICO TENDÊNCIA =================
             historico_tendencia.append(
                 (
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    agora.strftime("%Y-%m-%d %H:%M:%S"),
                     cor_atual,
                     codigo_atual
                 )
@@ -731,30 +739,47 @@ async def loop_previsoes():
             # ================= VALIDAR =================
             if ultima_previsao:
 
-                acertou = (
-                    cor_atual ==
-                    ultima_previsao[0]
-                )
+                # 🔥 CORREÇÃO: resultado sempre 1 ciclo atrás
+                hora_ref = (agora - timedelta(minutes=1)).strftime("%H:%M")
+
+                cor_esperada = ultima_previsao[0]
+
+                acertou = (cor_atual == cor_esperada)
 
                 await enviar_resultado(acertou)
 
-                horario = datetime.now().strftime(
-                    "%H:%M"
-                )
-
                 resultados.append(
                     (
-                        ultima_previsao[0],
-                        horario,
+                        cor_esperada,
+                        hora_ref,
                         acertou
                     )
                 )
 
-                if len(resultados) >= 20:
+                # ================= SALVAR CSV =================
+                try:
 
-                    await enviar_relatorio()
+                    arquivo_resultados = "resultados.csv"
 
-                    resultados = []
+                    if not os.path.exists(arquivo_resultados):
+
+                        with open(arquivo_resultados, "w", newline="", encoding="utf-8") as f:
+                            writer = csv.writer(f)
+                            writer.writerow(["Timestamp", "Cor", "Horario", "Resultado"])
+
+                    with open(arquivo_resultados, "a", newline="", encoding="utf-8") as f:
+
+                        writer = csv.writer(f)
+
+                        writer.writerow([
+                            agora.strftime("%Y-%m-%d %H:%M:%S"),
+                            cor_esperada,
+                            hora_ref,
+                            "WIN" if acertou else "LOSS"
+                        ])
+
+                except Exception as e:
+                    print(f"⚠️ Erro salvando resultado: {e}")
 
                 ultima_previsao = None
 
@@ -766,132 +791,48 @@ async def loop_previsoes():
             # =====================================================
             # 1 - ANÁLISE POR PRESSÃO DAS APOSTAS
             # =====================================================
-            resultado_pressao = (
-                calcular_pressao_apostas()
-            )
+            resultado_pressao = calcular_pressao_apostas()
 
             if resultado_pressao:
 
-                cor_pressao = (
-                    resultado_pressao.get("cor")
-                )
+                cor_pressao = resultado_pressao.get("cor")
+                forca_pressao = resultado_pressao.get("forca")
 
-                forca_pressao = (
-                    resultado_pressao.get("forca")
-                )
-
-                if cor_pressao in [
-                    "AZUL",
-                    "VERMELHO"
-                ]:
+                if cor_pressao in ["AZUL", "VERMELHO"]:
 
                     previsao_cor = cor_pressao
-
-                    confianca = min(
-                        forca_pressao / 1000,
-                        0.99
-                    )
-
-                    print(
-                        f"🔥 Pressão detectada: "
-                        f"{previsao_cor}"
-                    )
+                    confianca = min(forca_pressao / 1000, 0.99)
 
             # =====================================================
             # 2 - PREVISÃO POR CÓDIGO
             # =====================================================
-            resultado_codigo = (
-                calcular_previsao_exata(
-                    historico
-                )
-            )
+            resultado_codigo = calcular_previsao_exata(historico)
 
             if resultado_codigo:
 
-                codigo_prev, cor_prev, confianca_prev = (
-                    resultado_codigo
-                )
+                codigo_prev, cor_prev, confianca_prev = resultado_codigo
 
-                print(
-                    f"🎯 Sinal código: "
-                    f"{cor_prev}"
-                )
-
-                # ==========================================
-                # CONFIRMAÇÃO ENTRE SINAIS
-                # ==========================================
                 if previsao_cor:
 
                     if cor_prev == previsao_cor:
 
                         previsao_codigo = codigo_prev
-
-                        confianca = max(
-                            confianca or 0,
-                            confianca_prev
-                        )
-
-                        print(
-                            "✅ Pressão + Código confirmados"
-                        )
-
-                    else:
-
-                        print(
-                            "⚠️ Conflito entre pressão e código"
-                        )
+                        confianca = max(confianca or 0, confianca_prev)
 
                 else:
 
-                    if cor_prev in [
-                        "AZUL",
-                        "VERMELHO"
-                    ]:
-
-                        previsao_cor = cor_prev
-                        previsao_codigo = codigo_prev
-                        confianca = confianca_prev
+                    previsao_cor = cor_prev
+                    previsao_codigo = codigo_prev
+                    confianca = confianca_prev
 
             # =====================================================
-            # 3 - PREVISÃO POR COR/SEQUÊNCIA
+            # 3 - PREVISÃO POR COR
             # =====================================================
-            resultado_cor = (
-                calcular_previsao_exata_por_cor(
-                    historico
-                )
-            )
+            resultado_cor = calcular_previsao_exata_por_cor(historico)
 
             if resultado_cor:
 
-                print(
-                    f"🎨 Sinal cor: "
-                    f"{resultado_cor}"
-                )
-
-                # ==========================================
-                # CONFIRMAÇÃO ENTRE SINAIS
-                # ==========================================
-                if previsao_cor:
-
-                    if resultado_cor == previsao_cor:
-
-                        confianca = max(
-                            confianca or 0.70,
-                            0.85
-                        )
-
-                        print(
-                            "✅ Sequência confirmou sinal"
-                        )
-
-                    else:
-
-                        print(
-                            "⚠️ Sequência divergente"
-                        )
-
-                else:
-
+                if not previsao_cor:
                     previsao_cor = resultado_cor
 
             # =====================================================
@@ -899,10 +840,7 @@ async def loop_previsoes():
             # =====================================================
             if previsao_cor:
 
-                ultima_previsao = (
-                    previsao_cor,
-                    previsao_codigo
-                )
+                ultima_previsao = (previsao_cor, previsao_codigo)
 
                 await enviar_previsao(
                     previsao_cor,
@@ -911,39 +849,25 @@ async def loop_previsoes():
                 )
 
             # ================= ESPERA =================
-            agora = datetime.now()
-
-            proximo = (
-                agora + timedelta(minutes=1)
-            ).replace(
+            proximo = (agora + timedelta(minutes=1)).replace(
                 second=15,
                 microsecond=0
             )
 
-            tempo = (
-                proximo - agora
-            ).total_seconds()
+            tempo = (proximo - agora).total_seconds()
 
             if tempo <= 0:
-
                 proximo += timedelta(minutes=1)
+                tempo = (proximo - agora).total_seconds()
 
-                tempo = (
-                    proximo - agora
-                ).total_seconds()
-
-            print(
-                f"⏳ Esperando {tempo:.1f}s"
-            )
+            print(f"⏳ Esperando {tempo:.1f}s")
 
             await asyncio.sleep(tempo)
 
         except Exception as e:
 
             print(f"❌ Erro loop: {e}")
-
             await asyncio.sleep(5)
-
 # =========================================================
 # MAIN
 # =========================================================
