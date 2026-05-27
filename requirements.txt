@@ -1,0 +1,5 @@
+python-telegram-bot
+pillow
+playwright==1.52.0
+requests
+aiohttp
