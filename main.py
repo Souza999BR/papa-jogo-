@@ -678,8 +678,34 @@ async def resetar_bot():
 
         print(f"⚠️ Erro resetando memória: {e}")
 
+    try:
+
+        # =========================================
+        # RESET resultados.csv
+        # =========================================
+        with open(
+            "resultados.csv",
+            "w",
+            newline="",
+            encoding="utf-8"
+        ) as f:
+
+            writer = csv.writer(f)
+
+            writer.writerow([
+                "Timestamp",
+                "Cor",
+                "Horario",
+                "Resultado"
+            ])
+
+        print("🗑️ resultados.csv resetado!")
+
+    except Exception as e:
+
+        print(f"⚠️ Erro resetando resultados.csv: {e}")
+
     print("🚀 Bot continua rodando normalmente!")
-    
 
 # =========================================================
 # LOOP PRINCIPAL
