@@ -630,82 +630,27 @@ async def resetar_bot():
     print("🔄 Resetando bot...")
 
     try:
-
-        # =========================================
-        # ENVIAR RELATÓRIO
-        # =========================================
-        if resultados:
-
-            await enviar_relatorio()
-
-            print("📊 Relatório enviado!")
+        await enviar_relatorio()
 
     except Exception as e:
-
         print(f"⚠️ Erro relatório final: {e}")
 
     try:
 
-        # =========================================
-        # ATUALIZAR PADRÕES
-        # =========================================
         subprocess.run(
             [sys.executable, "padrao.py"],
             check=True
         )
 
-        print("✅ padrao.py executado!")
-
     except Exception as e:
-
         print(f"⚠️ Erro padrao.py: {e}")
 
-    try:
+    print("♻️ Reiniciando processo...")
 
-        # =========================================
-        # RESET SOMENTE DOS DADOS TEMPORÁRIOS
-        # =========================================
-        resultados.clear()
-
-        historico_tendencia.clear()
-
-        global ultima_previsao
-        ultima_previsao = None
-
-        print("✅ Dados temporários resetados!")
-
-    except Exception as e:
-
-        print(f"⚠️ Erro resetando memória: {e}")
-
-    try:
-
-        # =========================================
-        # RESET resultados.csv
-        # =========================================
-        with open(
-            "resultados.csv",
-            "w",
-            newline="",
-            encoding="utf-8"
-        ) as f:
-
-            writer = csv.writer(f)
-
-            writer.writerow([
-                "Timestamp",
-                "Cor",
-                "Horario",
-                "Resultado"
-            ])
-
-        print("🗑️ resultados.csv resetado!")
-
-    except Exception as e:
-
-        print(f"⚠️ Erro resetando resultados.csv: {e}")
-
-    print("🚀 Bot continua rodando normalmente!")
+    os.execv(
+        sys.executable,
+        [sys.executable] + sys.argv
+    )
 
 # =========================================================
 # LOOP PRINCIPAL
@@ -734,20 +679,7 @@ async def loop_previsoes():
 
                 ultima_hora_reset = agora.hour
 
-                try:
-
-        # =========================================
-        # RESET APENAS DOS DADOS TEMPORÁRIOS
-        # =========================================
-
-                    historico_tendencia.clear()
-                    resultados.clear()
-
-                    print("✅ Reset realizado sem reiniciar o bot")
-
-                except Exception as e:
-
-                    print(f"⚠️ Erro reset: {e}")
+                await resetar_bot()
 
             # ================= RELATÓRIO POR HORA =================
             if "ultima_hora_relatorio" not in globals():
@@ -981,27 +913,24 @@ if __name__ == "__main__":
         # =========================================
         # SEQ_HIST_FILE
         # =========================================
-        if not os.path.exists(SEQ_HIST_FILE):
+        with open(
+            SEQ_HIST_FILE,
+            "w",
+            newline="",
+            encoding="utf-8"
+        ) as f:
 
-            with open(
-                SEQ_HIST_FILE,
-                "w",
-                newline="",
-                encoding="utf-8"
-            ) as f:
+            writer = csv.writer(f)
 
-                writer = csv.writer(f)
-
-                writer.writerow([
-                    "Timestamp",
-                    "Cor",
-                    "Codigo"
-                ])
+            writer.writerow([
+                "Timestamp",
+                "Cor",
+                "Codigo"
+            ])
 
         # =========================================
         # RESULTADOS.CSV
         # =========================================
-        # 🔥 RESETA SEMPRE
         with open(
             "resultados.csv",
             "w",
@@ -1021,25 +950,22 @@ if __name__ == "__main__":
         # =========================================
         # SEQUENCIAS.CSV
         # =========================================
-        # 🔥 NÃO RESETAR
-        if not os.path.exists("sequencias.csv"):
+        with open(
+            "sequencias.csv",
+            "w",
+            newline="",
+            encoding="utf-8"
+        ) as f:
 
-            with open(
-                "sequencias.csv",
-                "w",
-                newline="",
-                encoding="utf-8"
-            ) as f:
+            writer = csv.writer(f)
 
-                writer = csv.writer(f)
+            writer.writerow([
+                "Timestamp",
+                "Cor",
+                "Codigo"
+            ])
 
-                writer.writerow([
-                    "Timestamp",
-                    "Cor",
-                    "Codigo"
-                ])
-
-        print("📂 CSVs preparados!")
+        print("📂 CSVs resetados!")
 
     except Exception as e:
 
