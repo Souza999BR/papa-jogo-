@@ -954,84 +954,62 @@ if __name__ == "__main__":
         # =========================================
         # SEQ_HIST_FILE
         # =========================================
-        if not os.path.exists(SEQ_HIST_FILE):
+        with open(
+            SEQ_HIST_FILE,
+            "w",
+            newline="",
+            encoding="utf-8"
+        ) as f:
 
-            with open(
-                SEQ_HIST_FILE,
-                "w",
-                newline="",
-                encoding="utf-8"
-            ) as f:
+            writer = csv.writer(f)
 
-                writer = csv.writer(f)
-
-                writer.writerow([
-                    "Timestamp",
-                    "Cor",
-                    "Codigo"
-                ])
-
-            print("✅ seq_hist criado!")
+            writer.writerow([
+                "Timestamp",
+                "Cor",
+                "Codigo"
+            ])
 
         # =========================================
         # RESULTADOS.CSV
         # =========================================
-        if not os.path.exists("resultados.csv"):
+        with open(
+            "resultados.csv",
+            "w",
+            newline="",
+            encoding="utf-8"
+        ) as f:
 
-            with open(
-                "resultados.csv",
-                "w",
-                newline="",
-                encoding="utf-8"
-            ) as f:
+            writer = csv.writer(f)
 
-                writer = csv.writer(f)
-
-                writer.writerow([
-                    "Timestamp",
-                    "Cor",
-                    "Horario",
-                    "Resultado"
-                ])
-
-            print("✅ resultados.csv criado!")
+            writer.writerow([
+                "Timestamp",
+                "Cor",
+                "Horario",
+                "Resultado"
+            ])
 
         # =========================================
         # SEQUENCIAS.CSV
         # =========================================
-        if not os.path.exists("sequencias.csv"):
+        with open(
+            "sequencias.csv",
+            "w",
+            newline="",
+            encoding="utf-8"
+        ) as f:
 
-            with open(
-                "sequencias.csv",
-                "w",
-                newline="",
-                encoding="utf-8"
-            ) as f:
+            writer = csv.writer(f)
 
-                writer = csv.writer(f)
+            writer.writerow([
+                "Timestamp",
+                "Cor",
+                "Codigo"
+            ])
 
-                writer.writerow([
-                    "Timestamp",
-                    "Cor",
-                    "Codigo"
-                ])
-
-            print("✅ sequencias.csv criado!")
-
-        print("📂 Sistema iniciado com histórico preservado!")
+        print("📂 CSVs resetados!")
 
     except Exception as e:
 
         print(f"⚠️ Erro CSV: {e}")
 
-    try:
-
-        asyncio.run(main())
-
-    except KeyboardInterrupt:
-
-        print("🛑 Bot encerrado manualmente")
-
-    except Exception as e:
-
-        print(f"❌ Erro fatal: {e}")
+    asyncio.run(main())
