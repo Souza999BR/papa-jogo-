@@ -630,26 +630,56 @@ async def resetar_bot():
     print("🔄 Resetando bot...")
 
     try:
-        await enviar_relatorio()
+
+        # =========================================
+        # ENVIAR RELATÓRIO
+        # =========================================
+        if resultados:
+
+            await enviar_relatorio()
+
+            print("📊 Relatório enviado!")
 
     except Exception as e:
+
         print(f"⚠️ Erro relatório final: {e}")
 
     try:
 
+        # =========================================
+        # ATUALIZAR PADRÕES
+        # =========================================
         subprocess.run(
             [sys.executable, "padrao.py"],
             check=True
         )
 
+        print("✅ padrao.py executado!")
+
     except Exception as e:
+
         print(f"⚠️ Erro padrao.py: {e}")
 
-    subprocess.Popen(
-        [sys.executable] + sys.argv
-    )
+    try:
 
-    sys.exit(0)
+        # =========================================
+        # RESET SOMENTE DOS DADOS TEMPORÁRIOS
+        # =========================================
+        resultados.clear()
+
+        historico_tendencia.clear()
+
+        global ultima_previsao
+        ultima_previsao = None
+
+        print("✅ Dados temporários resetados!")
+
+    except Exception as e:
+
+        print(f"⚠️ Erro resetando memória: {e}")
+
+    print("🚀 Bot continua rodando normalmente!")
+    
 
 # =========================================================
 # LOOP PRINCIPAL
@@ -678,7 +708,19 @@ async def loop_previsoes():
 
                 ultima_hora_reset = agora.hour
 
-                await resetar_bot()
+                try:
+
+        # =========================================
+        # RESET APENAS DOS DADOS TEMPORÁRIOS
+        # =========================================
+
+                    historico_tendencia.clear()
+
+                    print("✅ Reset realizado sem reiniciar o bot")
+
+                except Exception as e:
+
+                    print(f"⚠️ Erro reset: {e}")
 
             # ================= RELATÓRIO POR HORA =================
             if "ultima_hora_relatorio" not in globals():
@@ -912,62 +954,84 @@ if __name__ == "__main__":
         # =========================================
         # SEQ_HIST_FILE
         # =========================================
-        with open(
-            SEQ_HIST_FILE,
-            "w",
-            newline="",
-            encoding="utf-8"
-        ) as f:
+        if not os.path.exists(SEQ_HIST_FILE):
 
-            writer = csv.writer(f)
+            with open(
+                SEQ_HIST_FILE,
+                "w",
+                newline="",
+                encoding="utf-8"
+            ) as f:
 
-            writer.writerow([
-                "Timestamp",
-                "Cor",
-                "Codigo"
-            ])
+                writer = csv.writer(f)
+
+                writer.writerow([
+                    "Timestamp",
+                    "Cor",
+                    "Codigo"
+                ])
+
+            print("✅ seq_hist criado!")
 
         # =========================================
         # RESULTADOS.CSV
         # =========================================
-        with open(
-            "resultados.csv",
-            "w",
-            newline="",
-            encoding="utf-8"
-        ) as f:
+        if not os.path.exists("resultados.csv"):
 
-            writer = csv.writer(f)
+            with open(
+                "resultados.csv",
+                "w",
+                newline="",
+                encoding="utf-8"
+            ) as f:
 
-            writer.writerow([
-                "Timestamp",
-                "Cor",
-                "Horario",
-                "Resultado"
-            ])
+                writer = csv.writer(f)
+
+                writer.writerow([
+                    "Timestamp",
+                    "Cor",
+                    "Horario",
+                    "Resultado"
+                ])
+
+            print("✅ resultados.csv criado!")
 
         # =========================================
         # SEQUENCIAS.CSV
         # =========================================
-        with open(
-            "sequencias.csv",
-            "w",
-            newline="",
-            encoding="utf-8"
-        ) as f:
+        if not os.path.exists("sequencias.csv"):
 
-            writer = csv.writer(f)
+            with open(
+                "sequencias.csv",
+                "w",
+                newline="",
+                encoding="utf-8"
+            ) as f:
 
-            writer.writerow([
-                "Timestamp",
-                "Cor",
-                "Codigo"
-            ])
+                writer = csv.writer(f)
 
-        print("📂 CSVs resetados!")
+                writer.writerow([
+                    "Timestamp",
+                    "Cor",
+                    "Codigo"
+                ])
+
+            print("✅ sequencias.csv criado!")
+
+        print("📂 Sistema iniciado com histórico preservado!")
 
     except Exception as e:
 
         print(f"⚠️ Erro CSV: {e}")
 
-    asyncio.run(main())
+    try:
+
+        asyncio.run(main())
+
+    except KeyboardInterrupt:
+
+        print("🛑 Bot encerrado manualmente")
+
+    except Exception as e:
+
+        print(f"❌ Erro fatal: {e}")
