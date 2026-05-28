@@ -715,6 +715,7 @@ async def loop_previsoes():
         # =========================================
 
                     historico_tendencia.clear()
+                    resultados.clear()
 
                     print("✅ Reset realizado sem reiniciar o bot")
 
@@ -954,24 +955,27 @@ if __name__ == "__main__":
         # =========================================
         # SEQ_HIST_FILE
         # =========================================
-        with open(
-            SEQ_HIST_FILE,
-            "w",
-            newline="",
-            encoding="utf-8"
-        ) as f:
+        if not os.path.exists(SEQ_HIST_FILE):
 
-            writer = csv.writer(f)
+            with open(
+                SEQ_HIST_FILE,
+                "w",
+                newline="",
+                encoding="utf-8"
+            ) as f:
 
-            writer.writerow([
-                "Timestamp",
-                "Cor",
-                "Codigo"
-            ])
+                writer = csv.writer(f)
+
+                writer.writerow([
+                    "Timestamp",
+                    "Cor",
+                    "Codigo"
+                ])
 
         # =========================================
         # RESULTADOS.CSV
         # =========================================
+        # 🔥 RESETA SEMPRE
         with open(
             "resultados.csv",
             "w",
@@ -991,22 +995,25 @@ if __name__ == "__main__":
         # =========================================
         # SEQUENCIAS.CSV
         # =========================================
-        with open(
-            "sequencias.csv",
-            "w",
-            newline="",
-            encoding="utf-8"
-        ) as f:
+        # 🔥 NÃO RESETAR
+        if not os.path.exists("sequencias.csv"):
 
-            writer = csv.writer(f)
+            with open(
+                "sequencias.csv",
+                "w",
+                newline="",
+                encoding="utf-8"
+            ) as f:
 
-            writer.writerow([
-                "Timestamp",
-                "Cor",
-                "Codigo"
-            ])
+                writer = csv.writer(f)
 
-        print("📂 CSVs resetados!")
+                writer.writerow([
+                    "Timestamp",
+                    "Cor",
+                    "Codigo"
+                ])
+
+        print("📂 CSVs preparados!")
 
     except Exception as e:
 
