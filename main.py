@@ -6,7 +6,7 @@ import sys
 import os
 
 from datetime import datetime, timedelta
-
+from acessorio import prever_proximo_acessorio
 from telegram import (
     Bot,
     Update
@@ -67,6 +67,8 @@ STICKER_LOSS = 'CAACAgEAAxkBAAITqmgtvwzbwwMwZP57WU4uu45iR_2BAALCAAMHBnhH7HTVhGeX
 # ================= VARIÁVEIS =================
 ultima_previsao = None
 
+ultima_hora_relatorio_enviado = None
+
 resultados = []
 
 ultima_hora_reset = datetime.now().hour
@@ -75,7 +77,6 @@ ultima_hora_reset = datetime.now().hour
 hora_reset_tendencia = datetime.now().hour
 
 historico_tendencia = []
-
 
 # =========================================================
 # HISTÓRICO
@@ -298,39 +299,41 @@ async def tendencia(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def enviar_previsao(
     cor_prevista,
     codigo_previsto=None,
-    confianca=None
+    confianca=None,
+    acessorio=None
 ):
 
     if not cor_prevista:
         return
 
-    img_url = escolher_imagem_exata(
-        cor_prevista
-    )
+    img_url = escolher_imagem_exata(cor_prevista)
 
-    horario = datetime.now().strftime(
-        "%Y-%m-%d %H:%M:%S"
-    )
+    horario = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+    # =====================================================
+    # MENSAGEM BASE (COR + ACESSÓRIO JUNTO)
+    # =====================================================
     mensagem = (
         f"⏰ {horario}\n"
         f"🎯 Próxima previsão: {cor_prevista}"
+        f"{' | 🎩 ' + acessorio if acessorio else ''}"
     )
 
+    # =====================================================
+    # CÓDIGO PREVISTO
+    # =====================================================
     if codigo_previsto:
+        mensagem += f"\n🔑 Código previsto: {codigo_previsto}"
 
-        mensagem += (
-            f"\n🔑 Código previsto: "
-            f"{codigo_previsto}"
-        )
-
+    # =====================================================
+    # CONFIANÇA
+    # =====================================================
     if confianca is not None:
+        mensagem += f"\n📊 Confiança: {confianca:.1%}"
 
-        mensagem += (
-            f"\n📊 Confiança: "
-            f"{confianca:.1%}"
-        )
-
+    # =====================================================
+    # ENVIO
+    # =====================================================
     try:
 
         if img_url:
@@ -348,10 +351,7 @@ async def enviar_previsao(
                 text=mensagem
             )
 
-        print(
-            f"📤 Previsão enviada: "
-            f"{cor_prevista}"
-        )
+        print(f"📤 Previsão enviada: {cor_prevista}")
 
     except Exception as e:
         print(f"⚠️ Erro previsão: {e}")
@@ -827,26 +827,46 @@ async def loop_previsoes():
                     confianca = confianca_prev
 
             # =====================================================
-            # 3 - PREVISÃO POR COR
+            # 3 - COR
             # =====================================================
             resultado_cor = calcular_previsao_exata_por_cor(historico)
 
-            if resultado_cor:
-
-                if not previsao_cor:
-                    previsao_cor = resultado_cor
+            if resultado_cor and not previsao_cor:
+                previsao_cor = resultado_cor
 
             # =====================================================
             # ENVIO FINAL
             # =====================================================
             if previsao_cor:
 
+                # ================= ACESSÓRIO (CONDICIONAL) =================
+                acessorio_previsto = None
+
+                try:
+
+                    usar_acessorio = True
+
+                    if previsao_codigo and confianca and confianca >= 0.95:
+                        usar_acessorio = False
+
+                    if usar_acessorio:
+                        resultado_acessorio = prever_proximo_acessorio()
+
+                        if resultado_acessorio:
+                            acessorio_previsto = resultado_acessorio.get("acessorio")
+
+                            print(f"🎩 Acessório previsto: {acessorio_previsto}")
+
+                except Exception as e:
+                    print(f"⚠️ Erro previsão acessório: {e}")
+
                 ultima_previsao = (previsao_cor, previsao_codigo)
 
                 await enviar_previsao(
                     previsao_cor,
                     previsao_codigo,
-                    confianca
+                    confianca,
+                    acessorio_previsto
                 )
 
             # ================= ESPERA =================
@@ -866,7 +886,6 @@ async def loop_previsoes():
             await asyncio.sleep(tempo)
 
         except Exception as e:
-
             print(f"❌ Erro loop: {e}")
             await asyncio.sleep(5)
 # =========================================================
