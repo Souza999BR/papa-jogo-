@@ -740,21 +740,14 @@ async def loop_previsoes():
             # ================= VALIDAR =================
             if ultima_previsao:
 
-                # 🔥 CORREÇÃO: resultado sempre 1 ciclo atrás
                 hora_ref = (agora - timedelta(minutes=1)).strftime("%H:%M")
-
                 cor_esperada = ultima_previsao[0]
-
                 acertou = (cor_atual == cor_esperada)
 
                 await enviar_resultado(acertou)
 
                 resultados.append(
-                    (
-                        cor_esperada,
-                        hora_ref,
-                        acertou
-                    )
+                    (cor_esperada, hora_ref, acertou)
                 )
 
                 # ================= SALVAR CSV =================
@@ -763,15 +756,12 @@ async def loop_previsoes():
                     arquivo_resultados = "resultados.csv"
 
                     if not os.path.exists(arquivo_resultados):
-
                         with open(arquivo_resultados, "w", newline="", encoding="utf-8") as f:
                             writer = csv.writer(f)
                             writer.writerow(["Timestamp", "Cor", "Horario", "Resultado"])
 
                     with open(arquivo_resultados, "a", newline="", encoding="utf-8") as f:
-
                         writer = csv.writer(f)
-
                         writer.writerow([
                             agora.strftime("%Y-%m-%d %H:%M:%S"),
                             cor_esperada,
