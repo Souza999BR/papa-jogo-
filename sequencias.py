@@ -563,9 +563,13 @@ def calcular_previsao_exata_por_cor(
     historico_cores,
     caminho_seq='seq.csv',
     caminho_resultados='resultados.csv',
-    caminho_sequencias='sequencias.csv',
-    caminho_modo='modo_analise.txt'
+    caminho_sequencias='sequencias.csv'
 ):
+
+    import os
+    import csv
+    import ast
+    from datetime import datetime
 
     if len(historico_cores) < 5:
         return None
@@ -592,79 +596,95 @@ def calcular_previsao_exata_por_cor(
         return None
 
     # ==========================================
-    # CONTROLE DE TENDÊNCIA
+    # WIN / LOSS
     # ==========================================
 
     total_win = 0
     total_loss = 0
 
     try:
-
         if os.path.exists(caminho_resultados):
 
             with open(caminho_resultados, 'r', encoding='utf-8') as f:
-
                 leitor = csv.reader(f)
                 next(leitor, None)
 
                 for linha in leitor:
-
                     linha_texto = ",".join(linha).upper()
 
                     if "WIN" in linha_texto:
                         total_win += 1
-
                     elif "LOSS" in linha_texto:
                         total_loss += 1
 
         print(f"📊 WIN: {total_win} | LOSS: {total_loss}")
 
-        # ==========================================
-        # NOVA REGRA DE TENDÊNCIA
-        # ==========================================
-
-        novo_modo = "FAVOR" if total_loss > total_win else "CONTRA"
-
-        modo_anterior = None
-
-        if os.path.exists(caminho_modo):
-            with open(caminho_modo, 'r', encoding='utf-8') as f:
-                modo_anterior = f.read().strip()
-
-        # ==========================================
-        # SE MUDOU MODO → RESET SEQ
-        # ==========================================
-
-        if modo_anterior and modo_anterior != novo_modo:
-
-            print(f"🔄 Mudança de modo: {modo_anterior} → {novo_modo}")
-
-            try:
-                with open(caminho_seq, 'w', encoding='utf-8') as f:
-                    f.write("[]")
-
-                print("🗑️ seq.csv resetado por mudança de tendência.")
-
-            except Exception as e:
-                print(f"❌ Erro ao resetar seq.csv: {e}")
-
-        # ==========================================
-        # SALVA MODO
-        # ==========================================
-
-        with open(caminho_modo, 'w', encoding='utf-8') as f:
-            f.write(novo_modo)
-
-        modo_analise = novo_modo
-
-        print(f"🧠 Modo análise atual: {modo_analise}")
-
     except Exception as e:
-        print(f"❌ Erro ao analisar resultados.csv: {e}")
-        modo_analise = "CONTRA"
+        print(f"❌ Erro resultados: {e}")
 
     # ==========================================
-    # VERIFICA TROCA DE HORA
+    # CONTROLE DE MODO (COM 10 PADRÕES)
+    # ==========================================
+
+    quantidade_padroes = len(sequencias_fixas)
+    print(f"📚 Padrões acumulados: {quantidade_padroes}")
+
+    arquivo_modo = "modo_analise.txt"
+
+    modo_anterior = "CONTRA"
+
+    try:
+        if os.path.exists(arquivo_modo):
+            with open(arquivo_modo, "r", encoding="utf-8") as f:
+                modo_anterior = f.read().strip() or "CONTRA"
+    except:
+        pass
+
+    modo_analise = modo_anterior
+
+    if quantidade_padroes >= 10:
+
+        # ===== MUDAR PARA FAVOR =====
+        if modo_anterior == "CONTRA" and total_loss > total_win:
+
+            modo_analise = "FAVOR"
+
+            print("🔄 LOSS > WIN → Mudando para FAVOR")
+
+            try:
+                with open(caminho_seq, "w", encoding="utf-8") as f:
+                    f.write("[]")
+
+                print("🗑️ seq.csv resetado")
+            except:
+                pass
+
+        # ===== VOLTAR PARA CONTRA =====
+        elif modo_anterior == "FAVOR" and total_win > total_loss:
+
+            modo_analise = "CONTRA"
+
+            print("🔄 WIN > LOSS → Voltando para CONTRA")
+
+            try:
+                with open(caminho_seq, "w", encoding="utf-8") as f:
+                    f.write("[]")
+
+                print("🗑️ seq.csv resetado")
+            except:
+                pass
+
+    # salva modo atual
+    try:
+        with open(arquivo_modo, "w", encoding="utf-8") as f:
+            f.write(modo_analise)
+    except:
+        pass
+
+    print(f"🧠 Modo análise atual: {modo_analise}")
+
+    # ==========================================
+    # RESET POR HORA (RESULTADOS)
     # ==========================================
 
     try:
@@ -672,33 +692,43 @@ def calcular_previsao_exata_por_cor(
         if os.path.exists(caminho_sequencias):
 
             with open(caminho_sequencias, 'r', encoding='utf-8') as f:
-
                 leitor = csv.DictReader(f)
                 linhas = list(leitor)
 
             if linhas:
 
                 ultimo = linhas[-1]
-                timestamp_str = ultimo["Timestamp"]
 
                 data_obj = datetime.strptime(
-                    timestamp_str,
+                    ultimo["Timestamp"],
                     "%Y-%m-%d %H:%M:%S"
                 )
 
-                minuto = data_obj.minute
+                hora_atual = data_obj.strftime("%Y-%m-%d %H")
+                arquivo_hora = "ultima_hora_reset.txt"
 
-                if minuto == 0:
+                ultima_hora = ""
 
-                    print("⏰ Virada de hora detectada.")
-                    print("🔄 Reavaliando tendência...")
+                if os.path.exists(arquivo_hora):
+                    with open(arquivo_hora, "r", encoding="utf-8") as f:
+                        ultima_hora = f.read().strip()
 
-                    modo_analise = "FAVOR" if total_loss > total_win else "CONTRA"
+                if hora_atual != ultima_hora:
 
-                    print(f"🎯 Novo modo: {modo_analise}")
+                    print("⏰ Virada de hora detectada")
+
+                    # reset resultados
+                    with open(caminho_resultados, "w", newline="", encoding="utf-8") as f:
+                        writer = csv.writer(f)
+                        writer.writerow(["Resultado"])
+
+                    print("🗑️ resultados.csv resetado")
+
+                    with open(arquivo_hora, "w", encoding="utf-8") as f:
+                        f.write(hora_atual)
 
     except Exception as e:
-        print(f"❌ Erro ao verificar sequencias.csv: {e}")
+        print(f"❌ Erro reset hora: {e}")
 
     # ==========================================
     # BUSCA SEQUÊNCIA
@@ -717,10 +747,6 @@ def calcular_previsao_exata_por_cor(
         if ultimos == entrada_upper:
 
             previsao_original = saida.upper()
-
-            # ==========================================
-            # APLICA MODO
-            # ==========================================
 
             if modo_analise == "FAVOR":
                 previsao = previsao_original

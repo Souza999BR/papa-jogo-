@@ -164,27 +164,40 @@ def prever_proximo_acessorio():
         if taxa < 0.65:
             continue
 
-        votos.extend([pred] * int(taxa * pesos[janela] * 20))
+        votos.extend(
+            [pred] * int(
+                taxa * pesos[janela] * 20
+            )
+        )
 
     if not votos:
         return None
 
     final = Counter(votos)
 
-    codigo_previsto = final.most_common(1)[0][0]
+    acessorio_previsto = (
+        final.most_common(1)[0][0]
+    )
 
-    confianca = (final[codigo_previsto] / len(votos)) * 100
+    confianca = (
+        final[acessorio_previsto]
+        / len(votos)
+    ) * 100
 
     if confianca < 75:
         return None
 
-    ultima_previsao_acessorio = identificar_acessorio(codigo_previsto)
+    ultima_previsao_acessorio = (
+        acessorio_previsto
+    )
 
     return {
-        "acessorio": ultima_previsao_acessorio,
-        "confianca": round(confianca, 2)
+        "acessorio": acessorio_previsto,
+        "confianca": round(
+            confianca,
+            2
+        )
     }
-
 # =========================================================
 # VALIDAÇÃO (CORRETA POR CÓDIGO REAL)
 # =========================================================
