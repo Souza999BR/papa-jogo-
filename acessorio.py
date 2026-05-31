@@ -133,13 +133,13 @@ def prever_proximo_acessorio():
         print("⚠️ Histórico insuficiente para estabilidade real.")
         return None
 
-    pesos = {7: 5, 6: 4, 5: 3, 4: 2, 3: 1}
+    pesos = {7: 5, 6: 4, 5: 3, 4: 2}
 
     votos = []
 
     encontrou_padrao = False
 
-    for janela in [7, 6, 5, 4, 3]:
+    for janela in [7, 6, 5, 4]:
 
         if len(historico) < janela + 1:
             continue
