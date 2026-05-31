@@ -563,151 +563,119 @@ def calcular_previsao_exata_por_cor(
     historico_cores,
     caminho_seq='seq.csv',
     caminho_resultados='resultados.csv',
-    caminho_sequencias='sequencias.csv'
+    caminho_sequencias='sequencias.csv',
+    caminho_modo='modo_analise.txt'
 ):
 
     if len(historico_cores) < 5:
         return None
 
-    if not horarios_sao_consecutivos(
-        historico_cores
-    ):
+    if not horarios_sao_consecutivos(historico_cores):
         return None
 
     if not os.path.exists(caminho_seq):
-
-        print(
-            f"⚠️ Arquivo {caminho_seq} não encontrado."
-        )
-
+        print(f"⚠️ Arquivo {caminho_seq} não encontrado.")
         return None
 
     try:
-
-        with open(
-            caminho_seq,
-            'r',
-            encoding='utf-8'
-        ) as f:
-
+        with open(caminho_seq, 'r', encoding='utf-8') as f:
             conteudo = f.read().strip()
 
-        sequencias_fixas = ast.literal_eval(
-            conteudo
-        )
+        sequencias_fixas = ast.literal_eval(conteudo)
 
     except Exception as e:
-
-        print(
-            f"❌ Erro ao ler seq.csv: {e}"
-        )
-
+        print(f"❌ Erro ao ler seq.csv: {e}")
         return None
 
-    if not isinstance(
-        sequencias_fixas,
-        list
-    ):
-
+    if not isinstance(sequencias_fixas, list):
         print("⚠️ seq.csv inválido.")
-
         return None
 
     # ==========================================
     # CONTROLE DE TENDÊNCIA
     # ==========================================
 
-    modo_analise = "CONTRA"
-
     total_win = 0
     total_loss = 0
 
     try:
-
         if os.path.exists(caminho_resultados):
 
-            with open(
-                caminho_resultados,
-                'r',
-                encoding='utf-8'
-            ) as f:
-
+            with open(caminho_resultados, 'r', encoding='utf-8') as f:
                 leitor = csv.reader(f)
-
                 next(leitor, None)
 
                 for linha in leitor:
+                    linha_texto = ",".join(linha).upper()
 
-                    linha_texto = (
-                        ",".join(linha)
-                    ).upper()
-
-                    if (
-                        "WIN" in linha_texto
-                    ):
-
+                    if "WIN" in linha_texto:
                         total_win += 1
-
-                    elif (
-                        "LOSS" in linha_texto
-                    ):
-
+                    elif "LOSS" in linha_texto:
                         total_loss += 1
 
-        print(
-            f"📊 WIN: {total_win} | LOSS: {total_loss}"
-        )
+        print(f"📊 WIN: {total_win} | LOSS: {total_loss}")
 
         # ==========================================
-        # REGRA:
-        # SE LOSS > WIN = IR A FAVOR
-        # SENÃO = IR CONTRA
+        # DEFINE NOVO MODO
         # ==========================================
 
-        if total_loss > total_win:
+        novo_modo = "FAVOR" if total_loss > total_win else "CONTRA"
 
-            modo_analise = "FAVOR"
+        # ==========================================
+        # VERIFICA MODO ANTERIOR
+        # ==========================================
 
-        else:
+        modo_anterior = None
 
-            modo_analise = "CONTRA"
+        if os.path.exists(caminho_modo):
+            with open(caminho_modo, "r", encoding="utf-8") as f:
+                modo_anterior = f.read().strip()
 
-        print(
-            f"🧠 Modo análise atual: {modo_analise}"
-        )
+        # ==========================================
+        # SE MUDOU MODO → RESET SEQ
+        # ==========================================
+
+        if modo_anterior and modo_anterior != novo_modo:
+            print(f"🔄 Mudança de modo: {modo_anterior} → {novo_modo}")
+
+            try:
+                with open(caminho_seq, "w", encoding="utf-8") as f:
+                    f.write("[]")
+
+                print("🗑️ seq.csv resetado por mudança de tendência.")
+            except Exception as e:
+                print(f"❌ Erro ao resetar seq.csv: {e}")
+
+        # ==========================================
+        # SALVA MODO ATUAL
+        # ==========================================
+
+        with open(caminho_modo, "w", encoding="utf-8") as f:
+            f.write(novo_modo)
+
+        modo_analise = novo_modo
+
+        print(f"🧠 Modo análise atual: {modo_analise}")
 
     except Exception as e:
-
-        print(
-            f"❌ Erro ao analisar resultados.csv: {e}"
-        )
+        print(f"❌ Erro ao analisar resultados.csv: {e}")
+        modo_analise = "CONTRA"
 
     # ==========================================
     # VERIFICA TROCA DE HORA
-    # 13:00, 14:00, 15:00...
     # ==========================================
 
     try:
-
         if os.path.exists(caminho_sequencias):
 
-            with open(
-                caminho_sequencias,
-                'r',
-                encoding='utf-8'
-            ) as f:
-
+            with open(caminho_sequencias, 'r', encoding='utf-8') as f:
                 leitor = csv.DictReader(f)
-
                 linhas = list(leitor)
 
             if linhas:
 
                 ultimo = linhas[-1]
-
-                timestamp_str = (
-                    ultimo["Timestamp"]
-                )
+                timestamp_str = ultimo["Timestamp"]
 
                 data_obj = datetime.strptime(
                     timestamp_str,
@@ -716,37 +684,16 @@ def calcular_previsao_exata_por_cor(
 
                 minuto = data_obj.minute
 
-                # ==========================================
-                # CONFERE A CADA HORA CHEIA
-                # ==========================================
-
                 if minuto == 0:
+                    print("⏰ Virada de hora detectada.")
+                    print("🔄 Reavaliando tendência...")
 
-                    print(
-                        "⏰ Virada de hora detectada."
-                    )
+                    modo_analise = "FAVOR" if total_loss > total_win else "CONTRA"
 
-                    print(
-                        "🔄 Reavaliando tendência..."
-                    )
-
-                    if total_loss > total_win:
-
-                        modo_analise = "FAVOR"
-
-                    else:
-
-                        modo_analise = "CONTRA"
-
-                    print(
-                        f"🎯 Novo modo: {modo_analise}"
-                    )
+                    print(f"🎯 Novo modo: {modo_analise}")
 
     except Exception as e:
-
-        print(
-            f"❌ Erro ao verificar sequencias.csv: {e}"
-        )
+        print(f"❌ Erro ao verificar sequencias.csv: {e}")
 
     # ==========================================
     # BUSCA SEQUÊNCIA
@@ -759,86 +706,36 @@ def calcular_previsao_exata_por_cor(
         if len(historico_cores) < janela:
             continue
 
-        ultimos = [
-            x[1].upper()
-            for x in historico_cores[-janela:]
-        ]
-
-        entrada_upper = [
-            x.upper()
-            for x in entrada
-        ]
+        ultimos = [x[1].upper() for x in historico_cores[-janela:]]
+        entrada_upper = [x.upper() for x in entrada]
 
         if ultimos == entrada_upper:
 
-            previsao_original = (
-                saida.upper()
-            )
+            previsao_original = saida.upper()
 
             # ==========================================
-            # MODO FAVOR
+            # APLICA MODO
             # ==========================================
 
             if modo_analise == "FAVOR":
-
-                previsao = (
-                    previsao_original
-                )
-
-            # ==========================================
-            # MODO CONTRA
-            # ==========================================
-
+                previsao = previsao_original
             else:
-
-                if (
-                    previsao_original
-                    == "AZUL"
-                ):
-
+                if previsao_original == "AZUL":
                     previsao = "VERMELHO"
-
-                elif (
-                    previsao_original
-                    == "VERMELHO"
-                ):
-
+                elif previsao_original == "VERMELHO":
                     previsao = "AZUL"
-
                 else:
+                    previsao = previsao_original
 
-                    previsao = (
-                        previsao_original
-                    )
-
-            print(
-                f"✅ Sequência encontrada: "
-                f"{entrada_upper}"
-            )
-
-            print(
-                f"🔍 Padrão original: "
-                f"{previsao_original}"
-            )
-
-            print(
-                f"📈 Modo análise: "
-                f"{modo_analise}"
-            )
-
-            print(
-                f"🎯 Previsão final: "
-                f"{previsao}"
-            )
+            print(f"✅ Sequência encontrada: {entrada_upper}")
+            print(f"🔍 Padrão original: {previsao_original}")
+            print(f"📈 Modo análise: {modo_analise}")
+            print(f"🎯 Previsão final: {previsao}")
 
             return previsao
 
-    print(
-        "⚠️ Nenhuma sequência encontrada."
-    )
-
+    print("⚠️ Nenhuma sequência encontrada.")
     return None
-
 # ========================
 # PREVISÃO POR CÓDIGO
 # ========================
