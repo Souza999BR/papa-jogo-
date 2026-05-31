@@ -16,6 +16,8 @@ from telegram.error import TelegramError
 
 from telegram.request import HTTPXRequest
 
+from acessorio import obter_resultado_acessorio
+
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -68,6 +70,8 @@ STICKER_LOSS = 'CAACAgEAAxkBAAITqmgtvwzbwwMwZP57WU4uu45iR_2BAALCAAMHBnhH7HTVhGeX
 ultima_previsao = None
 
 ultima_hora_relatorio_enviado = None
+
+obter_resultado_acessorio()
 
 resultados = []
 
@@ -311,16 +315,29 @@ async def enviar_previsao(
     horario = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # =====================================================
-    # MENSAGEM BASE (COR + ACESSÓRIO JUNTO)
+    # REGRA PRINCIPAL:
+    # CÓDIGO TEM PRIORIDADE SOBRE ACESSÓRIO
     # =====================================================
+    usar_acessorio = True
+
+    if codigo_previsto:
+        usar_acessorio = False
+
+    # =====================================================
+    # MENSAGEM BASE
+    # =====================================================
+    linha_previsao = f"🎯 Próxima previsão: {cor_prevista}"
+
+    if usar_acessorio and acessorio:
+        linha_previsao += f" | ACESSÓRIO:  {acessorio}"
+
     mensagem = (
         f"⏰ {horario}\n"
-        f"🎯 Próxima previsão: {cor_prevista}"
-        f"{' | 🎩 ' + acessorio if acessorio else ''}"
+        f"{linha_previsao}"
     )
 
     # =====================================================
-    # CÓDIGO PREVISTO
+    # CÓDIGO PREVISTO (PRIORIDADE TOTAL)
     # =====================================================
     if codigo_previsto:
         mensagem += f"\n🔑 Código previsto: {codigo_previsto}"
@@ -435,9 +452,7 @@ async def enviar_relatorio():
 
         if len(linhas_csv) > 1:
 
-            ultima_hora_csv = (
-                linhas_csv[-1][0][:13]
-            )
+            ultima_hora_csv = linhas_csv[-1][0][:13]
 
             if ultima_hora_csv != hora_atual:
 
@@ -458,15 +473,12 @@ async def enviar_relatorio():
                     ])
 
                 print(
-                    f"🗑️ resultados.csv resetado "
-                    f"às {hora_atual}:00"
+                    f"🗑️ resultados.csv resetado às {hora_atual}:00"
                 )
 
     except Exception as e:
 
-        print(
-            f"⚠️ Erro reset CSV: {e}"
-        )
+        print(f"⚠️ Erro reset CSV: {e}")
 
     # =====================================================
     # SALVAR RESULTADOS
@@ -485,34 +497,23 @@ async def enviar_relatorio():
 
             for cor, horario, win in resultados:
 
-                resultado_texto = (
-                    "WIN"
-                    if win
-                    else "LOSS"
-                )
+                resultado_texto = "WIN" if win else "LOSS"
 
                 writer.writerow([
-                    datetime.now().strftime(
-                        "%Y-%m-%d %H:%M:%S"
-                    ),
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     cor,
                     horario,
                     resultado_texto
                 ])
 
-                print(
-                    f"💾 Resultado salvo: "
-                    f"{resultado_texto}"
-                )
+                print(f"💾 Resultado salvo: {resultado_texto}")
 
     except Exception as e:
 
-        print(
-            f"⚠️ Erro salvando CSV: {e}"
-        )
+        print(f"⚠️ Erro salvando CSV: {e}")
 
     # =====================================================
-    # CONTAGEM REAL DIRETO DO CSV
+    # CONTAGEM REAL DIRETO DO CSV (COR)
     # =====================================================
 
     wins = 0
@@ -520,39 +521,39 @@ async def enviar_relatorio():
 
     try:
 
-        with open(
-            arquivo_resultados,
-            "r",
-            encoding="utf-8"
-        ) as f:
+        with open(arquivo_resultados, "r", encoding="utf-8") as f:
 
             leitor = csv.DictReader(f)
 
             for linha in leitor:
 
-                resultado = (
-                    linha["Resultado"]
-                    .strip()
-                    .upper()
-                )
+                resultado = linha["Resultado"].strip().upper()
 
                 if resultado == "WIN":
-
                     wins += 1
 
                 elif resultado == "LOSS":
-
                     losses += 1
 
-        print(
-            f"📊 WIN: {wins} | LOSS: {losses}"
-        )
+        print(f"📊 WIN: {wins} | LOSS: {losses}")
 
     except Exception as e:
 
-        print(
-            f"⚠️ Erro lendo CSV: {e}"
-        )
+        print(f"⚠️ Erro lendo CSV: {e}")
+
+    # =====================================================
+    # 🔥 RESULTADO DOS ACESSÓRIOS
+    # =====================================================
+
+    try:
+
+        acessorio_wins, acessorio_losses = obter_resultado_acessorio()
+
+    except Exception as e:
+
+        print(f"⚠️ Erro acessório: {e}")
+        acessorio_wins = 0
+        acessorio_losses = 0
 
     # =====================================================
     # RELATÓRIO VISUAL
@@ -562,21 +563,12 @@ async def enviar_relatorio():
 
     for cor, horario, win in resultados:
 
-        simbolo = (
-            "✅"
-            if win
-            else "❌"
-        )
+        simbolo = "✅" if win else "❌"
 
-        cor_icon = (
-            "🔵"
-            if cor == "AZUL"
-            else "🔴"
-        )
+        cor_icon = "🔵" if cor == "AZUL" else "🔴"
 
         linhas.append(
-            f"{cor_icon} {cor:<8} "
-            f"{horario} ➧ {simbolo}"
+            f"{cor_icon} {cor:<8} {horario} ➧ {simbolo}"
         )
 
     relatorio = (
@@ -591,6 +583,10 @@ async def enviar_relatorio():
 
         f"✅ WINS: {wins}\n"
         f"❌ LOSS: {losses}\n\n"
+
+        "🎩 RESULTADO ACESSÓRIOS\n"
+        f"✅ WINS: {acessorio_wins}\n"
+        f"❌ LOSS: {acessorio_losses}\n\n"
 
         " 🚀 Enquanto muitos estão testando \n"
         "sorte, aqui é resultado com estratégia!\n"
@@ -612,9 +608,7 @@ async def enviar_relatorio():
 
     except Exception as e:
 
-        print(
-            f"⚠️ Relatório erro: {e}"
-        )
+        print(f"⚠️ Relatório erro: {e}")
 
     # =====================================================
     # LIMPA MEMÓRIA
