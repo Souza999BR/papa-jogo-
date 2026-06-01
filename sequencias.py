@@ -660,7 +660,7 @@ def calcular_previsao_exata_por_cor(
                 pass
 
         # ===== VOLTAR PARA CONTRA =====
-        elif modo_anterior == "FAVOR" and total_win > total_loss:
+        elif modo_anterior == "FAVOR" and total_win < total_loss:
 
             modo_analise = "CONTRA"
 
