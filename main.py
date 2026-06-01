@@ -318,9 +318,10 @@ async def enviar_previsao(
     # REGRA PRINCIPAL:
     # CÓDIGO TEM PRIORIDADE SOBRE ACESSÓRIO
     # =====================================================
+    # REGRA PRINCIPAL
     usar_acessorio = True
 
-    if codigo_previsto:
+    if codigo_previsto and confianca is not None and confianca >= 0.75:
         usar_acessorio = False
 
     # =====================================================
@@ -395,6 +396,7 @@ async def enviar_resultado(acertou):
     except Exception as e:
         print(f"⚠️ Erro sticker: {e}")
 
+
 # =========================================================
 # RELATÓRIO
 # =========================================================
@@ -407,18 +409,10 @@ async def enviar_relatorio():
     # =====================================================
     # CRIAR CSV CASO NÃO EXISTA
     # =====================================================
-
     if not os.path.exists(arquivo_resultados):
 
-        with open(
-            arquivo_resultados,
-            "w",
-            newline="",
-            encoding="utf-8"
-        ) as f:
-
+        with open(arquivo_resultados, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-
             writer.writerow([
                 "Timestamp",
                 "Cor",
@@ -427,28 +421,16 @@ async def enviar_relatorio():
             ])
 
     # =====================================================
-    # ZERAR RESULTADOS A CADA HORA
+    # RESET POR HORA
     # =====================================================
-
     agora = datetime.now()
-
     hora_atual = agora.strftime("%Y-%m-%d %H")
 
     try:
 
-        with open(
-            arquivo_resultados,
-            "r",
-            encoding="utf-8"
-        ) as f:
-
+        with open(arquivo_resultados, "r", encoding="utf-8") as f:
             leitor = csv.reader(f)
-
             linhas_csv = list(leitor)
-
-        # =================================================
-        # VERIFICA TROCA DE HORA
-        # =================================================
 
         if len(linhas_csv) > 1:
 
@@ -456,15 +438,8 @@ async def enviar_relatorio():
 
             if ultima_hora_csv != hora_atual:
 
-                with open(
-                    arquivo_resultados,
-                    "w",
-                    newline="",
-                    encoding="utf-8"
-                ) as f:
-
+                with open(arquivo_resultados, "w", newline="", encoding="utf-8") as f:
                     writer = csv.writer(f)
-
                     writer.writerow([
                         "Timestamp",
                         "Cor",
@@ -472,30 +447,28 @@ async def enviar_relatorio():
                         "Resultado"
                     ])
 
-                print(
-                    f"🗑️ resultados.csv resetado às {hora_atual}:00"
-                )
+                print(f"🗑️ resultados.csv resetado às {hora_atual}:00")
 
     except Exception as e:
-
         print(f"⚠️ Erro reset CSV: {e}")
 
     # =====================================================
-    # SALVAR RESULTADOS
+    # SALVAR RESULTADOS (BLINDADO UNPACK)
     # =====================================================
-
     try:
 
-        with open(
-            arquivo_resultados,
-            "a",
-            newline="",
-            encoding="utf-8"
-        ) as f:
-
+        with open(arquivo_resultados, "a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
 
-            for cor, horario, win in resultados:
+            for item in resultados:
+
+                # 🔥 proteção contra erro de unpack
+                if not item or len(item) < 3:
+                    continue
+
+                cor = item[0]
+                horario = item[1]
+                win = item[2]
 
                 resultado_texto = "WIN" if win else "LOSS"
 
@@ -509,20 +482,17 @@ async def enviar_relatorio():
                 print(f"💾 Resultado salvo: {resultado_texto}")
 
     except Exception as e:
-
         print(f"⚠️ Erro salvando CSV: {e}")
 
     # =====================================================
-    # CONTAGEM REAL DIRETO DO CSV (COR)
+    # CONTAGEM REAL DO CSV
     # =====================================================
-
     wins = 0
     losses = 0
 
     try:
 
         with open(arquivo_resultados, "r", encoding="utf-8") as f:
-
             leitor = csv.DictReader(f)
 
             for linha in leitor:
@@ -538,38 +508,40 @@ async def enviar_relatorio():
         print(f"📊 WIN: {wins} | LOSS: {losses}")
 
     except Exception as e:
-
         print(f"⚠️ Erro lendo CSV: {e}")
 
     # =====================================================
-    # 🔥 RESULTADO DOS ACESSÓRIOS
+    # ACESSÓRIOS (CORRETO - DICIONÁRIO)
     # =====================================================
-
     try:
 
-        acessorio_wins, acessorio_losses = obter_resultado_acessorio()
+        acc = obter_resultado_acessorio()
+        acessorio_wins = acc.get("wins", 0)
+        acessorio_losses = acc.get("loss", 0)
 
     except Exception as e:
-
         print(f"⚠️ Erro acessório: {e}")
         acessorio_wins = 0
         acessorio_losses = 0
 
     # =====================================================
-    # RELATÓRIO VISUAL
+    # RELATÓRIO VISUAL (BLINDADO)
     # =====================================================
-
     linhas = []
 
-    for cor, horario, win in resultados:
+    for item in resultados:
+
+        if not item or len(item) < 3:
+            continue
+
+        cor = item[0]
+        horario = item[1]
+        win = item[2]
 
         simbolo = "✅" if win else "❌"
-
         cor_icon = "🔵" if cor == "AZUL" else "🔴"
 
-        linhas.append(
-            f"{cor_icon} {cor:<8} {horario} ➧ {simbolo}"
-        )
+        linhas.append(f"{cor_icon} {cor:<8} {horario} ➧ {simbolo}")
 
     relatorio = (
         "━━━━━━◥◣◆◢◤━━━━━━\n"
@@ -588,13 +560,11 @@ async def enviar_relatorio():
         f"✅ WINS: {acessorio_wins}\n"
         f"❌ LOSS: {acessorio_losses}\n\n"
 
-        " 🚀 Enquanto muitos estão testando \n"
-        "sorte, aqui é resultado com estratégia!\n"
-        "💹 Se ainda está só assistindo de fora… \n"
-        "tá esperando o quê?\n\n"
+        "🚀 Enquanto muitos estão testando estratégia, aqui é resultado real!\n"
+        "💹 Se ainda está só assistindo… tá perdendo oportunidade.\n\n"
 
         "🎯 plataforma PAPA JOGO https://pa3333.com/?invite_code=UPJCSWGP\n"
-        "receba sinais FREE, Suporte @souza999br\n"
+        "Suporte @souza999br\n"
     )
 
     try:
@@ -607,15 +577,12 @@ async def enviar_relatorio():
         print("📊 Relatório enviado!")
 
     except Exception as e:
-
         print(f"⚠️ Relatório erro: {e}")
 
     # =====================================================
     # LIMPA MEMÓRIA
     # =====================================================
-
-    resultados.clear()
-    
+    resultados.clear() 
 # =========================================================
 # RESET
 # =========================================================
