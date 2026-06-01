@@ -642,7 +642,7 @@ def calcular_previsao_exata_por_cor(
 
     modo_analise = modo_anterior
 
-    if quantidade_padroes >= 10:
+    if quantidade_padroes >= 8:
 
         # ===== MUDAR PARA FAVOR =====
         if modo_anterior == "CONTRA" and total_loss > total_win:

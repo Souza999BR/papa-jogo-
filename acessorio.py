@@ -1,5 +1,8 @@
 import csv
 from collections import Counter
+import os
+import ast
+from datetime import datetime
 
 # =========================================================
 # ESTATÍSTICAS ACESSÓRIO
@@ -10,6 +13,7 @@ acessorio_loss = 0
 
 ultima_previsao_acessorio = None
 ultimo_codigo_processado = None
+ultimo_reset_hora = None
 
 # =========================================================
 # CÓDIGOS
@@ -22,7 +26,6 @@ CODIGOS_CHAPEU = {
     "9B1138C4B04769111A3756E7CC6E263E", "C2D2BC9253A4F95A06464C302C552FE8",
     "1701CF909C49835D0C793C7A7EF82A5D", "620726CCE3CBC8C574E5889CB404DA8C",
     "6B5DFCF1F44C9D485DDA1902AC33C0A9", "A5CB00D7C8FFFE5FB2C79C540A54817A"
-   
 }
 
 CODIGOS_OCULOS = {
@@ -32,7 +35,6 @@ CODIGOS_OCULOS = {
     "FAE594628F003E7D8250252BAA6A83B2", "F2A057FC73359A2781F0FD48F63D6FDE",
     "4864DAFB55D05D74897FDCE5DEE7FD22", "88CB29DAAB6DD7AE3016B506C36E9F17",
     "C22C60349630D688CEF20A3FD708AD87", "C0069D16731C2D1EEFF8F67ED560B89B"
-
 }
 
 CODIGOS_CHIFRE = {
@@ -42,7 +44,6 @@ CODIGOS_CHIFRE = {
     "2F5BB7747EFDA0546636FB385A3FA593", "1981E4A762B39858DC33F9EA28ED065A",
     "17380DDB842E984302034E1BB66C24E4", "2A0270F3B3A57F49C195A7F2B0736564",
     "3C46A0407BE60A1F00731AB8E9575DF2", "80D2B8BBB1D9FBB8AEC70C802CC67BAD"
-    
 }
 
 CODIGOS_SEM_ACESSORIO = {
@@ -52,14 +53,34 @@ CODIGOS_SEM_ACESSORIO = {
     "1F289CD1A244A837B3D946160B49E54D", "8FBDBF5573B18FAE93736180F8D0197A",
     "74BDEFAB9757A081606B181AC29F1DB2", "0299C06AED970473AE41D986B308CD09",
     "9634715CA7E046CDD0FC857CDC38DCB6", "09E25C12765906F32FEFCA6A9F366E15"
-    
 }
+
+# =========================================================
+# RESET POR HORA
+# =========================================================
+
+def resetar_por_hora(caminho_resultados, caminho_seq):
+    global ultimo_reset_hora
+
+    agora = datetime.now().hour
+
+    if ultimo_reset_hora == agora:
+        return
+
+    ultimo_reset_hora = agora
+
+    print("⏰ RESET DE HORA EXECUTADO")
+
+    with open(caminho_resultados, "w", encoding="utf-8") as f:
+        f.write("resultado\n")
+
+    print("CSVs resetados (resultados.csv)")
+
 # =========================================================
 # IDENTIFICAR ACESSÓRIO
 # =========================================================
 
 def identificar_acessorio(codigo):
-
     if not codigo:
         return "DESCONHECIDO"
 
@@ -81,7 +102,6 @@ def identificar_acessorio(codigo):
 # =========================================================
 
 def carregar_historico(csv_file="sequencias.csv"):
-
     historico = []
 
     try:
@@ -92,13 +112,9 @@ def carregar_historico(csv_file="sequencias.csv"):
                 reader = reader[:-1]
 
             for row in reader:
-
                 codigo = row.get("Codigo", "").strip().upper()
-
-                if not codigo:
-                    continue
-
-                historico.append(codigo)
+                if codigo:
+                    historico.append(codigo)
 
     except Exception as e:
         print(f"⚠️ Erro CSV: {e}")
@@ -110,17 +126,14 @@ def carregar_historico(csv_file="sequencias.csv"):
 # =========================================================
 
 def gerar_padroes(historico, janela=4):
-
     padroes = {}
 
     if len(historico) < janela + 1:
         return padroes
 
     for i in range(len(historico) - janela):
-
         seq = tuple(historico[i:i + janela])
         prox = historico[i + janela]
-
         padroes.setdefault(seq, []).append(prox)
 
     return padroes
@@ -130,7 +143,6 @@ def gerar_padroes(historico, janela=4):
 # =========================================================
 
 def prever_proximo_acessorio():
-
     global ultima_previsao_acessorio
 
     historico = carregar_historico()
@@ -139,71 +151,52 @@ def prever_proximo_acessorio():
         return None
 
     votos = []
-    pesos = {7:5, 6:4, 5:3, 4:2}
+    pesos = {7: 5, 6: 4, 5: 3, 4: 2}
 
-    for janela in [7,6,5,4]:
-
+    for janela in [7, 6, 5, 4]:
         if len(historico) < janela + 1:
             continue
 
         padroes = gerar_padroes(historico, janela)
-
         seq = tuple(historico[-janela:])
 
         if seq not in padroes:
             continue
 
         proximos = padroes[seq]
-
         contador = Counter(proximos)
 
         pred = contador.most_common(1)[0][0]
-
         taxa = contador[pred] / len(proximos)
 
         if taxa < 0.65:
             continue
 
-        votos.extend(
-            [pred] * int(
-                taxa * pesos[janela] * 20
-            )
-        )
+        votos.extend([pred] * int(taxa * pesos[janela] * 20))
 
     if not votos:
         return None
 
     final = Counter(votos)
+    acessorio_previsto = final.most_common(1)[0][0]
 
-    acessorio_previsto = (
-        final.most_common(1)[0][0]
-    )
-
-    confianca = (
-        final[acessorio_previsto]
-        / len(votos)
-    ) * 100
+    confianca = (final[acessorio_previsto] / len(votos)) * 100
 
     if confianca < 75:
         return None
 
-    ultima_previsao_acessorio = (
-        acessorio_previsto
-    )
+    ultima_previsao_acessorio = acessorio_previsto
 
     return {
         "acessorio": acessorio_previsto,
-        "confianca": round(
-            confianca,
-            2
-        )
+        "confianca": round(confianca, 2)
     }
+
 # =========================================================
-# VALIDAÇÃO (CORRETA POR CÓDIGO REAL)
+# VALIDAÇÃO
 # =========================================================
 
 def processar_validacao_acessorio():
-
     global acessorio_wins, acessorio_loss
     global ultima_previsao_acessorio, ultimo_codigo_processado
 
@@ -219,22 +212,9 @@ def processar_validacao_acessorio():
 
     ultimo_codigo_processado = codigo_real
 
-    def tipo(codigo):
+    real = identificar_acessorio(codigo_real)
 
-        if codigo in CODIGOS_CHAPEU:
-            return "CHAPEU"
-        if codigo in CODIGOS_OCULOS:
-            return "OCULOS"
-        if codigo in CODIGOS_CHIFRE:
-            return "CHIFRE"
-        if codigo in CODIGOS_SEM_ACESSORIO:
-            return "SEM ACESSORIO"
-
-        return None
-
-    real = tipo(codigo_real)
-
-    if not ultima_previsao_acessorio or not real:
+    if not ultima_previsao_acessorio or real == "DESCONHECIDO":
         return
 
     if real == ultima_previsao_acessorio:
@@ -249,7 +229,6 @@ def processar_validacao_acessorio():
 # =========================================================
 
 def obter_resultado_acessorio():
-
     total = acessorio_wins + acessorio_loss
 
     taxa = (acessorio_wins / total * 100) if total else 0
