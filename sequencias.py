@@ -664,7 +664,7 @@ def calcular_previsao_exata_por_cor(
 
             modo_analise = "CONTRA"
 
-            print("🔄 WIN > LOSS → Voltando para CONTRA")
+            print("🔄 WIN < LOSS → Voltando para CONTRA")
 
             try:
                 with open(caminho_seq, "w", encoding="utf-8") as f:
