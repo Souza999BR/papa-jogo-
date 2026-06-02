@@ -645,6 +645,8 @@ def calcular_previsao_exata_por_cor(
 
     except Exception as erro:
         print(f"⚠️ Erro ao carregar modo: {erro}")
+        
+    modo_analise = modo_anterior
 
     if quantidade_padroes >= 8:
 
