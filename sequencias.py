@@ -666,11 +666,11 @@ def calcular_previsao_exata_por_cor(
                 pass
 
         # ===== VOLTAR PARA CONTRA =====
-        elif modo_anterior == "FAVOR" and total_win < total_loss:
+        elif modo_anterior == "FAVOR" and  total_loss > total_win:
 
             modo_analise = "CONTRA"
 
-            print("🔄 WIN < LOSS → Voltando para CONTRA")
+            print("🔄  LOSS > WIN → Voltando para CONTRA")
 
             try:
                 with open(caminho_seq, "w", encoding="utf-8") as f:
