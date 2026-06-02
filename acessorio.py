@@ -172,7 +172,7 @@ def prever_proximo_acessorio():
         if taxa < 0.65:
             continue
 
-        votos.extend([pred] * int(taxa * pesos[janela] * 20))
+        votos.extend([pred] * int(taxa * pesos[janela] * 10))
 
     if not votos:
         return None

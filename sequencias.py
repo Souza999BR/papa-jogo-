@@ -632,15 +632,19 @@ def calcular_previsao_exata_por_cor(
     arquivo_modo = "modo_analise.txt"
 
     modo_anterior = "CONTRA"
+   
 
     try:
         if os.path.exists(arquivo_modo):
-            with open(arquivo_modo, "r", encoding="utf-8") as f:
-                modo_anterior = f.read().strip() or "CONTRA"
-    except:
-        pass
+           with open(arquivo_modo, "r", encoding="utf-8") as f:
 
-    modo_analise = modo_anterior
+                valor_salvo = f.read().strip().upper()
+
+                if valor_salvo in ["CONTRA", "FAVOR"]:
+                    modo_anterior = valor_salvo
+
+    except Exception as erro:
+        print(f"⚠️ Erro ao carregar modo: {erro}")
 
     if quantidade_padroes >= 8:
 
