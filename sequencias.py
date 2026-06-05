@@ -631,7 +631,7 @@ def calcular_previsao_exata_por_cor(
 
     arquivo_modo = "modo_analise.txt"
 
-    modo_anterior = "CONTRA"
+    modo_anterior = "FAVOR"
    
 
     try:
@@ -648,7 +648,7 @@ def calcular_previsao_exata_por_cor(
         
     modo_analise = modo_anterior
 
-    if quantidade_padroes >= 8:
+    if quantidade_padroes >= 5:
 
         # ===== MUDAR PARA FAVOR =====
         if modo_anterior == "CONTRA" and total_loss > total_win:
@@ -754,22 +754,35 @@ def calcular_previsao_exata_por_cor(
 
             previsao_original = saida.upper()
 
+            # ======================================
+            # COR FINAL
+            # ======================================
+
             if modo_analise == "FAVOR":
-                previsao = previsao_original
+                cor_prevista = previsao_original
             else:
                 if previsao_original == "AZUL":
-                    previsao = "VERMELHO"
+                    cor_prevista = "VERMELHO"
                 elif previsao_original == "VERMELHO":
-                    previsao = "AZUL"
+                    cor_prevista = "AZUL"
                 else:
-                    previsao = previsao_original
+                    cor_prevista = previsao_original
 
             print(f"✅ Sequência encontrada: {entrada_upper}")
             print(f"🔍 Padrão original: {previsao_original}")
             print(f"📈 Modo análise: {modo_analise}")
-            print(f"🎯 Previsão final: {previsao}")
+            print(f"🎯 PREVISÃO COR FINAL: {cor_prevista}")
 
-            return previsao
+            # ======================================
+            # RETORNO PADRONIZADO (COR + ACESSÓRIO)
+            # ======================================
+
+            return {
+                "cor": cor_prevista,
+                "entrada": entrada_upper,
+                "original": previsao_original,
+                "modo": modo_analise
+            }
 
     print("⚠️ Nenhuma sequência encontrada.")
     return None

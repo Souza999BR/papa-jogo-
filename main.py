@@ -17,6 +17,7 @@ from telegram.error import TelegramError
 from telegram.request import HTTPXRequest
 
 from acessorio import obter_resultado_acessorio
+from acessorio import CODIGOS_AZUL, CODIGOS_VERMELHO
 
 from telegram.ext import (
     Application,
@@ -310,27 +311,89 @@ async def enviar_previsao(
     if not cor_prevista:
         return
 
-    img_url = escolher_imagem_exata(cor_prevista)
-
     horario = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # =====================================================
     # REGRA PRINCIPAL:
     # CÓDIGO TEM PRIORIDADE SOBRE ACESSÓRIO
     # =====================================================
-    # REGRA PRINCIPAL
     usar_acessorio = True
 
-    if codigo_previsto and confianca is not None and confianca >= 0.75:
+    if (
+        codigo_previsto
+        and confianca is not None
+        and confianca >= 0.74
+    ):
         usar_acessorio = False
+
+    # =====================================================
+    # NORMALIZA COR
+    # =====================================================
+    cor_base = (
+        cor_prevista["cor"]
+        if isinstance(cor_prevista, dict)
+        else cor_prevista
+    )
+
+    # =====================================================
+    # IMAGEM
+    # =====================================================
+    img_url = None
+
+    if usar_acessorio and acessorio:
+
+        try:
+
+            acessorio = acessorio.upper()
+
+            if cor_base.upper() == "AZUL":
+
+                if acessorio in CODIGOS_AZUL:
+
+                    codigo_img = CODIGOS_AZUL[acessorio][0]
+
+                    img_url = (
+                        f"https://www.pa3333.com/static/game/"
+                        f"{codigo_img}.png"
+                    )
+
+            elif cor_base.upper() == "VERMELHO":
+
+                if acessorio in CODIGOS_VERMELHO:
+
+                    codigo_img = CODIGOS_VERMELHO[acessorio][0]
+
+                    img_url = (
+                        f"https://www.pa3333.com/static/game/"
+                        f"{codigo_img}.png"
+                    )
+
+        except Exception as erro:
+            print(f"⚠️ Erro imagem acessório: {erro}")
+
+    # =====================================================
+    # FALLBACK PARA IMAGEM NORMAL DA COR
+    # =====================================================
+    if not img_url:
+        img_url = escolher_imagem_exata(cor_base)
+
+    # =====================================================
+    # DEBUG
+    # =====================================================
+    print(f"DEBUG cor = {cor_base}")
+    print(f"DEBUG codigo_previsto = {codigo_previsto}")
+    print(f"DEBUG confianca = {confianca}")
+    print(f"DEBUG acessorio = {acessorio}")
+    print(f"DEBUG usar_acessorio = {usar_acessorio}")
+    print(f"DEBUG img_url = {img_url}")
 
     # =====================================================
     # MENSAGEM BASE
     # =====================================================
-    linha_previsao = f"🎯 Próxima previsão: {cor_prevista}"
+    linha_previsao = f"🎯 Próxima previsão: {cor_base}"
 
     if usar_acessorio and acessorio:
-        linha_previsao += f" | ACESSÓRIO:  {acessorio}"
+        linha_previsao += f" | ACESSÓRIO: {acessorio}"
 
     mensagem = (
         f"⏰ {horario}\n"
@@ -338,7 +401,7 @@ async def enviar_previsao(
     )
 
     # =====================================================
-    # CÓDIGO PREVISTO (PRIORIDADE TOTAL)
+    # CÓDIGO PREVISTO
     # =====================================================
     if codigo_previsto:
         mensagem += f"\n🔑 Código previsto: {codigo_previsto}"
@@ -369,11 +432,10 @@ async def enviar_previsao(
                 text=mensagem
             )
 
-        print(f"📤 Previsão enviada: {cor_prevista}")
+        print(f"📤 Previsão enviada: {cor_base}")
 
     except Exception as e:
         print(f"⚠️ Erro previsão: {e}")
-
 
 # =========================================================
 # RESULTADO
@@ -583,6 +645,7 @@ async def enviar_relatorio():
     # LIMPA MEMÓRIA
     # =====================================================
     resultados.clear() 
+    
 # =========================================================
 # RESET
 # =========================================================
@@ -797,13 +860,26 @@ async def loop_previsoes():
 
                     usar_acessorio = True
 
-                    if previsao_codigo and confianca and confianca >= 0.95:
+                    if (
+                        previsao_codigo
+                        and confianca is not None
+                        and confianca >= 0.74
+                    ):
                         usar_acessorio = False
 
+                        print(
+                            f"🔑 Código forte detectado "
+                            f"({confianca:.1%}) - acessório bloqueado"
+                        )
+
                     if usar_acessorio:
+
                         resultado_acessorio = prever_proximo_acessorio()
 
+                        print(f"DEBUG ACESSÓRIO: {resultado_acessorio}")
+
                         if resultado_acessorio:
+
                             acessorio_previsto = resultado_acessorio.get("acessorio")
 
                             print(f"🎩 Acessório previsto: {acessorio_previsto}")
