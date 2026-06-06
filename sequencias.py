@@ -651,7 +651,7 @@ def calcular_previsao_exata_por_cor(
     if quantidade_padroes >= 5:
 
         # ===== MUDAR PARA FAVOR =====
-        if modo_anterior == "CONTRA" and total_loss > total_win:
+        if modo_anterior == "CONTRA" and total_loss >= total_win:
 
             modo_analise = "FAVOR"
 
@@ -666,7 +666,7 @@ def calcular_previsao_exata_por_cor(
                 pass
 
         # ===== VOLTAR PARA CONTRA =====
-        elif modo_anterior == "FAVOR" and  total_loss > total_win:
+        elif modo_anterior == "FAVOR" and  total_loss >= total_win:
 
             modo_analise = "CONTRA"
 
