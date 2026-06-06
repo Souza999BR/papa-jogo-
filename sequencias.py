@@ -804,11 +804,6 @@ def calcular_previsao_exata(
 
         return None
 
-    # =========================
-    # AJUSTE:
-    # NORMALIZA DATAS DO CSV
-    # =========================
-
     historico_normalizado = []
 
     try:
@@ -841,15 +836,7 @@ def calcular_previsao_exata(
 
         return None
 
-    historico_codigos = (
-        historico_normalizado
-    )
-
-    # =====================================
-    # AJUSTE:
-    # IGNORA PEQUENAS QUEBRAS
-    # DE HORÁRIO
-    # =====================================
+    historico_codigos = historico_normalizado
 
     sequencia_valida = []
 
@@ -880,7 +867,6 @@ def calcular_previsao_exata(
 
         # =========================================
         # AGRUPA POR HORA
-        # RESET AUTOMÁTICO 1H
         # =========================================
 
         blocos_hora = {}
@@ -902,212 +888,226 @@ def calcular_previsao_exata(
                 )
             )
 
-        TAM_JANELA = 4
+        apenas_cores_atuais = [
+
+            cor
+
+            for _, cor, _
+            in historico_codigos
+
+        ]
+
+        cor_prevista = None
+        confianca = 0
+        janela_usada = None
+        cor_dominante = None
+        proximas_cores = []
 
         # =========================================
-        # PADRÕES POR COR
+        # PROCURA PADRÃO MAIS FORTE
+        # 6 -> 5 -> 4
         # =========================================
 
-        padroes_cores = {}
+        for TAM_JANELA in [6, 5]:
 
-        for hora, dados in blocos_hora.items():
+            padroes_cores = {}
 
-            if len(dados) < (
-                TAM_JANELA + 2
+            for hora, dados in blocos_hora.items():
+
+                if len(dados) <= TAM_JANELA:
+                    continue
+
+                apenas_cores = [
+
+                    cor
+
+                    for _, cor, _
+                    in dados
+
+                ]
+
+                for i in range(
+                    len(apenas_cores)
+                    - TAM_JANELA
+                ):
+
+                    janela = tuple(
+                        apenas_cores[
+                            i:i + TAM_JANELA
+                        ]
+                    )
+
+                    proxima_cor = (
+                        apenas_cores[
+                            i + TAM_JANELA
+                        ]
+                    )
+
+                    padroes_cores.setdefault(
+                        janela,
+                        []
+                    ).append(
+                        proxima_cor
+                    )
+
+            janela_atual_cores = tuple(
+                apenas_cores_atuais[
+                    -TAM_JANELA:
+                ]
+            )
+
+            if (
+                janela_atual_cores
+                not in padroes_cores
             ):
                 continue
 
-            apenas_cores = [
+            proximas_cores_local = (
+                padroes_cores[
+                    janela_atual_cores
+                ]
+            )
+
+            if len(proximas_cores_local) < 3:
+                continue
+
+            contagem_cores = {
+
+                cor: proximas_cores_local.count(
+                    cor
+                )
+
+                for cor in set(
+                    proximas_cores_local
+                )
+            }
+
+            total = len(
+                proximas_cores_local
+            )
+
+            dominante_local = max(
+                contagem_cores,
+                key=contagem_cores.get
+            )
+
+            maior_contagem = (
+                contagem_cores[
+                    dominante_local
+                ]
+            )
+
+            confianca_local = (
+                maior_contagem / total
+            )
+
+            if confianca_local < 0.80:
+                continue
+
+            candidatos = [
+
                 cor
-                for _, cor, _
-                in dados
+
+                for cor, qtd
+                in contagem_cores.items()
+
+                if qtd == maior_contagem
+
             ]
 
-            for i in range(
-                len(apenas_cores)
-                - TAM_JANELA
-            ):
+            if len(candidatos) > 1:
+                continue
 
-                janela = tuple(
-                    apenas_cores[
-                        i:i + TAM_JANELA
-                    ]
-                )
+            cor_prevista = dominante_local
+            confianca = confianca_local
+            cor_dominante = dominante_local
+            janela_usada = TAM_JANELA
+            proximas_cores = proximas_cores_local
 
-                proxima_cor = (
-                    apenas_cores[
-                        i + TAM_JANELA
-                    ]
-                )
+            break
 
-                padroes_cores.setdefault(
-                    janela,
-                    []
-                ).append(
-                    proxima_cor
-                )
-
-        apenas_cores_atuais = [
-            cor
-            for _, cor, _
-            in historico_codigos
-        ]
-
-        janela_atual_cores = tuple(
-            apenas_cores_atuais[
-                -TAM_JANELA:
-            ]
-        )
-
-        if (
-            janela_atual_cores
-            not in padroes_cores
-        ):
+        if not cor_prevista:
 
             print(
-                "⚠️ Sem padrão de cor encontrado."
-            )
-
-            return None
-
-        proximas_cores = (
-            padroes_cores[
-                janela_atual_cores
-            ]
-        )
-
-        # =====================================
-        # EVITA FALSO PADRÃO
-        # =====================================
-
-        if len(proximas_cores) < 3:
-
-            print(
-                "⚠️ Poucos padrões encontrados."
-            )
-
-            return None
-
-        contagem_cores = {
-
-            cor: proximas_cores.count(
-                cor
-            )
-
-            for cor in set(
-                proximas_cores
-            )
-        }
-
-        total = len(proximas_cores)
-
-        # =====================================
-        # PEGA COR DOMINANTE
-        # =====================================
-
-        cor_dominante = max(
-            contagem_cores,
-            key=contagem_cores.get
-        )
-
-        maior_contagem = (
-            contagem_cores[
-                cor_dominante
-            ]
-        )
-
-        confianca = (
-            maior_contagem / total
-        )
-
-        # =====================================
-        # EVITA ENTRADA FRACA
-        # =====================================
-
-        if confianca < 0.70:
-
-            print(
-                f"⚠️ Confiança baixa: "
-                f"{confianca:.2%}"
+                "⚠️ Nenhum padrão forte encontrado."
             )
 
             return None
 
         # =====================================
-        # EVITA EMPATE
+        # INVERTE APENAS EM TENDÊNCIA FORTE
         # =====================================
 
-        candidatos = [
+        ultimas_cores = apenas_cores_atuais[-4:]
 
-            cor
-
-            for cor, qtd
-            in contagem_cores.items()
-
-            if qtd == maior_contagem
-        ]
-
-        if len(candidatos) > 1:
+        if len(set(ultimas_cores)) == 1:
 
             print(
-                "⚠️ Empate de padrão."
+                "🔄 Tendência forte detectada."
             )
 
-            return None
+            if cor_prevista == "AZUL":
 
-        # =====================================
-        # AJUSTE PRINCIPAL:
-        # INVERTE A ENTRADA
-        # =====================================
+                cor_prevista = "VERMELHO"
 
-        if cor_dominante == "AZUL":
+            else:
 
-            cor_prevista = "VERMELHO"
-
-        else:
-
-            cor_prevista = "AZUL"
+                cor_prevista = "AZUL"
 
         # =========================================
         # PREVISÃO POR CÓDIGO
         # =========================================
 
         apenas_codigos = [
-            c for _, _, c
+
+            c
+
+            for _, _, c
             in historico_codigos
+
         ]
-
-        padroes = {}
-
-        for i in range(
-            len(apenas_codigos)
-            - TAM_JANELA
-        ):
-
-            janela = tuple(
-                apenas_codigos[
-                    i:i + TAM_JANELA
-                ]
-            )
-
-            proximo = apenas_codigos[
-                i + TAM_JANELA
-            ]
-
-            padroes.setdefault(
-                janela,
-                []
-            ).append(proximo)
-
-        janela_atual = tuple(
-            apenas_codigos[
-                -TAM_JANELA:
-            ]
-        )
 
         proximo_codigo = None
 
-        if janela_atual in padroes:
+        for TAM_JANELA in [6, 5]:
+
+            if len(apenas_codigos) <= TAM_JANELA:
+                continue
+
+            padroes = {}
+
+            for i in range(
+                len(apenas_codigos)
+                - TAM_JANELA
+            ):
+
+                janela = tuple(
+                    apenas_codigos[
+                        i:i + TAM_JANELA
+                    ]
+                )
+
+                proximo = (
+                    apenas_codigos[
+                        i + TAM_JANELA
+                    ]
+                )
+
+                padroes.setdefault(
+                    janela,
+                    []
+                ).append(
+                    proximo
+                )
+
+            janela_atual = tuple(
+                apenas_codigos[
+                    -TAM_JANELA:
+                ]
+            )
+
+            if janela_atual not in padroes:
+                continue
 
             proximos = padroes[
                 janela_atual
@@ -1122,10 +1122,6 @@ def calcular_previsao_exata(
                         codigo
                     )
                 )
-
-                # =====================================
-                # FILTRA PELA COR INVERTIDA
-                # =====================================
 
                 if (
                     cor_codigo
@@ -1149,12 +1145,15 @@ def calcular_previsao_exata(
                     in set(
                         codigos_filtrados
                     )
+
                 }
 
                 proximo_codigo = max(
                     contagens,
                     key=contagens.get
                 )
+
+                break
 
         # =========================================
         # FALLBACK
@@ -1172,8 +1171,8 @@ def calcular_previsao_exata(
                     break
 
         print(
-            f"🔎 Janela Cores: "
-            f"{janela_atual_cores}"
+            f"🔎 Janela usada: "
+            f"{janela_usada}"
         )
 
         print(
@@ -1187,7 +1186,7 @@ def calcular_previsao_exata(
         )
 
         print(
-            f"🔄 Entrada invertida: "
+            f"🎯 Cor prevista: "
             f"{cor_prevista}"
         )
 
