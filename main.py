@@ -515,7 +515,7 @@ async def enviar_relatorio():
         print(f"⚠️ Erro reset CSV: {e}")
 
     # =====================================================
-    # SALVAR RESULTADOS (BLINDADO UNPACK)
+    # SALVAR RESULTADOS
     # =====================================================
     try:
 
@@ -524,7 +524,6 @@ async def enviar_relatorio():
 
             for item in resultados:
 
-                # 🔥 proteção contra erro de unpack
                 if not item or len(item) < 3:
                     continue
 
@@ -532,11 +531,17 @@ async def enviar_relatorio():
                 horario = item[1]
                 win = item[2]
 
+                # =========================================
+                # NORMALIZA COR
+                # =========================================
+                if isinstance(cor, dict):
+                    cor = cor.get("cor", "DESCONHECIDO")
+
                 resultado_texto = "WIN" if win else "LOSS"
 
                 writer.writerow([
                     datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    cor,
+                    str(cor),
                     horario,
                     resultado_texto
                 ])
@@ -555,6 +560,7 @@ async def enviar_relatorio():
     try:
 
         with open(arquivo_resultados, "r", encoding="utf-8") as f:
+
             leitor = csv.DictReader(f)
 
             for linha in leitor:
@@ -573,38 +579,67 @@ async def enviar_relatorio():
         print(f"⚠️ Erro lendo CSV: {e}")
 
     # =====================================================
-    # ACESSÓRIOS (CORRETO - DICIONÁRIO)
+    # ACESSÓRIOS
     # =====================================================
     try:
 
         acc = obter_resultado_acessorio()
+
         acessorio_wins = acc.get("wins", 0)
         acessorio_losses = acc.get("loss", 0)
 
     except Exception as e:
+
         print(f"⚠️ Erro acessório: {e}")
+
         acessorio_wins = 0
         acessorio_losses = 0
 
     # =====================================================
-    # RELATÓRIO VISUAL (BLINDADO)
+    # RELATÓRIO VISUAL (LENDO CSV)
     # =====================================================
     linhas = []
 
-    for item in resultados:
+    try:
 
-        if not item or len(item) < 3:
-            continue
+        with open(arquivo_resultados, "r", encoding="utf-8") as f:
 
-        cor = item[0]
-        horario = item[1]
-        win = item[2]
+            leitor = csv.DictReader(f)
 
-        simbolo = "✅" if win else "❌"
-        cor_icon = "🔵" if cor == "AZUL" else "🔴"
+            for linha in leitor:
 
-        linhas.append(f"{cor_icon} {cor:<8} {horario} ➧ {simbolo}")
+                cor = str(linha["Cor"]).strip()
+                horario = str(linha["Horario"]).strip()
+                resultado = str(linha["Resultado"]).strip().upper()
 
+                # =========================================
+                # CORRIGE REGISTROS ANTIGOS COM DICT
+                # =========================================
+                if "AZUL" in cor:
+                    cor = "AZUL"
+
+                elif "VERMELHO" in cor:
+                    cor = "VERMELHO"
+
+                simbolo = "✅" if resultado == "WIN" else "❌"
+
+                cor_icon = (
+                    "🔵"
+                    if cor == "AZUL"
+                    else "🔴"
+                )
+
+                linhas.append(
+                    f"{cor_icon} {cor:<8} {horario} ➧ {simbolo}"
+                )
+
+    except Exception as e:
+
+        print(f"⚠️ Erro montando relatório: {e}")
+
+    # =====================================================
+    # RELATÓRIO FINAL
+    # =====================================================
     relatorio = (
         "━━━━━━◥◣◆◢◤━━━━━━\n"
         "PLATAFORMA PAPA JOGO\n"
@@ -644,7 +679,7 @@ async def enviar_relatorio():
     # =====================================================
     # LIMPA MEMÓRIA
     # =====================================================
-    resultados.clear() 
+    resultados.clear()
     
 # =========================================================
 # RESET
@@ -766,6 +801,10 @@ async def loop_previsoes():
 
                 hora_ref = (agora - timedelta(minutes=1)).strftime("%H:%M")
                 cor_esperada = ultima_previsao[0]
+                # CORRIGE QUANDO A PREVISÃO VEM COMO DICT
+                if isinstance(cor_esperada, dict):
+                    cor_esperada = cor_esperada.get("cor", "DESCONHECIDO")
+
                 acertou = (cor_atual == cor_esperada)
 
                 await enviar_resultado(acertou)
