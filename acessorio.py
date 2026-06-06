@@ -246,11 +246,10 @@ def prever_proximo_acessorio():
         pesos = {
             5: 5,
             4: 4,
-            3: 3,
-            2: 2
+            3: 3         
         }
 
-        for janela in [5, 4, 3, 2]:
+        for janela in [5, 4, 3]:
 
             if len(historico) < janela + 1:
                 continue
