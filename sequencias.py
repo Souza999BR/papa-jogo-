@@ -651,7 +651,7 @@ def calcular_previsao_exata_por_cor(
     if quantidade_padroes >= 9:
 
         # ===== MUDAR PARA FAVOR =====
-        if modo_anterior == "CONTRA" and total_loss >= total_win:
+        if modo_anterior == "CONTRA" and total_loss > total_win:
 
             modo_analise = "FAVOR"
 
@@ -666,7 +666,7 @@ def calcular_previsao_exata_por_cor(
                 pass
 
         # ===== VOLTAR PARA CONTRA =====
-        elif modo_anterior == "FAVOR" and  total_loss >= total_win:
+        elif modo_anterior == "FAVOR" and  total_loss > total_win:
 
             modo_analise = "CONTRA"
 
@@ -737,52 +737,41 @@ def calcular_previsao_exata_por_cor(
         print(f"❌ Erro reset hora: {e}")
 
     # ==========================================
-    # BUSCA SEQUÊNCIA
+    # BUSCA SEQUÊNCIA (JANELAS 6,5,4)
     # ==========================================
 
-    for entrada, saida in sequencias_fixas:
+    janelas_prioridade = [6, 5, 4]
 
-        janela = len(entrada)
+    for janela_desejada in janelas_prioridade:
 
-        if len(historico_cores) < janela:
-            continue
+        for entrada, saida in sequencias_fixas:
 
-        ultimos = [x[1].upper() for x in historico_cores[-janela:]]
-        entrada_upper = [x.upper() for x in entrada]
+            janela = len(entrada)
 
-        if ultimos == entrada_upper:
+            if janela != janela_desejada:
+                continue
 
-            previsao_original = saida.upper()
+            if len(historico_cores) < janela:
+                continue
 
-            # ======================================
-            # COR FINAL
-            # ======================================
+            ultimos = [x[1].upper() for x in historico_cores[-janela:]]
+            entrada_upper = [x.upper() for x in entrada]
 
-            if modo_analise == "FAVOR":
-                cor_prevista = previsao_original
-            else:
-                if previsao_original == "AZUL":
-                    cor_prevista = "VERMELHO"
-                elif previsao_original == "VERMELHO":
-                    cor_prevista = "AZUL"
-                else:
-                    cor_prevista = previsao_original
+            if ultimos == entrada_upper:
 
-            print(f"✅ Sequência encontrada: {entrada_upper}")
-            print(f"🔍 Padrão original: {previsao_original}")
-            print(f"📈 Modo análise: {modo_analise}")
-            print(f"🎯 PREVISÃO COR FINAL: {cor_prevista}")
+                previsao_original = saida.upper()
 
-            # ======================================
-            # RETORNO PADRONIZADO (COR + ACESSÓRIO)
-            # ======================================
+                print(f"✅ Sequência encontrada: {entrada_upper}")
+                print(f"🔍 Padrão original: {previsao_original}")
+                print(f"📈 Modo análise: {modo_analise}")
+                print(f"🎯 PREVISÃO COR: {previsao_original}")
 
-            return {
-                "cor": cor_prevista,
-                "entrada": entrada_upper,
-                "original": previsao_original,
-                "modo": modo_analise
-            }
+                return {
+                    "cor": previsao_original,
+                    "entrada": entrada_upper,
+                    "original": previsao_original,
+                    "modo": modo_analise
+                }
 
     print("⚠️ Nenhuma sequência encontrada.")
     return None
