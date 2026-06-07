@@ -571,7 +571,7 @@ def calcular_previsao_exata_por_cor(
     import ast
     from datetime import datetime
 
-    if len(historico_cores) < 6:
+    if len(historico_cores) < 7:
         return None
 
     if not horarios_sao_consecutivos(historico_cores):
@@ -672,13 +672,7 @@ def calcular_previsao_exata_por_cor(
 
             print("🔄  LOSS > WIN → Voltando para CONTRA")
 
-            try:
-                with open(caminho_seq, "w", encoding="utf-8") as f:
-                    f.write("[]")
-
-                print("🗑️ seq.csv resetado")
-            except:
-                pass
+            
 
     # salva modo atual
     try:
