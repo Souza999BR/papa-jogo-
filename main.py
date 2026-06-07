@@ -6,7 +6,6 @@ import sys
 import os
 
 from datetime import datetime, timedelta
-from acessorio import prever_proximo_acessorio
 from telegram import (
     Bot,
     Update
@@ -16,8 +15,7 @@ from telegram.error import TelegramError
 
 from telegram.request import HTTPXRequest
 
-from acessorio import obter_resultado_acessorio
-from acessorio import CODIGOS_AZUL, CODIGOS_VERMELHO
+
 
 from telegram.ext import (
     Application,
@@ -29,6 +27,15 @@ from PIL import (
     Image,
     ImageDraw,
     ImageFont
+)
+
+
+from acessorio import (
+    prever_proximo_acessorio,
+    obter_resultado_acessorio,
+    processar_validacao_acessorio,
+    CODIGOS_AZUL,
+    CODIGOS_VERMELHO
 )
 
 
@@ -812,6 +819,12 @@ async def loop_previsoes():
                 resultados.append(
                     (cor_esperada, hora_ref, acertou)
                 )
+                
+                # ================= VALIDAÇÃO ACESSÓRIO =================
+                try:
+                    processar_validacao_acessorio()
+                except Exception as e:
+                    print(f"⚠️ Erro validação acessório: {e}")
 
                 # ================= SALVAR CSV =================
                 try:
