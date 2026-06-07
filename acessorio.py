@@ -197,7 +197,7 @@ def carregar_historico(csv_file="sequencias.csv"):
 # PADRÕES
 # =========================================================
 
-def gerar_padroes(historico, janela=4):
+def gerar_padroes(historico, janela=6):
 
     padroes = {}
 
@@ -239,17 +239,17 @@ def prever_proximo_acessorio():
 
     ]:
 
-        if len(historico) < 6:
+        if len(historico) < 7:
             continue
 
         votos = []
         pesos = {
+            6: 6,
             5: 5,
-            4: 4,
-            3: 3         
+            4: 4         
         }
 
-        for janela in [5, 4, 3]:
+        for janela in [6, 5, 4]:
 
             if len(historico) < janela + 1:
                 continue
