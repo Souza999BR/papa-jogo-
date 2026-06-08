@@ -329,7 +329,7 @@ async def enviar_previsao(
     if (
         codigo_previsto
         and confianca is not None
-        and confianca >= 0.74
+        and confianca >= 0.85
     ):
         usar_acessorio = False
 

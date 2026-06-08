@@ -278,7 +278,7 @@ def prever_proximo_acessorio():
                     / len(proximos)
                 )
 
-                if taxa >= 0.55:
+                if taxa >= 0.75:
 
                     votos.extend(
                         [pred] * int(
