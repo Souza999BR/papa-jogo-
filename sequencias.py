@@ -656,6 +656,16 @@ def calcular_previsao_exata_por_cor(
             modo_analise = "FAVOR"
 
             print("🔄 LOSS > WIN → Mudando para FAVOR")
+            
+            try:
+                with open(caminho_seq, "w", encoding="utf-8") as f:
+                    
+                    f.write("[]")
+
+                print("🗑️ seq.csv resetado")
+
+            except:
+                pass            
 
             
 
@@ -666,9 +676,7 @@ def calcular_previsao_exata_por_cor(
 
             print("🔄  LOSS > WIN → Voltando para CONTRA")
             
-            
-
-            
+             
 
     # salva modo atual
     try:
