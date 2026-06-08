@@ -245,11 +245,11 @@ def prever_proximo_acessorio():
         votos = []
         pesos = {
             6: 6,
-            5: 5,
-            4: 4         
+            5: 5
+                    
         }
 
-        for janela in [6, 5, 4]:
+        for janela in [6, 5]:
 
             if len(historico) < janela + 1:
                 continue

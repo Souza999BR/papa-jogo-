@@ -648,7 +648,7 @@ def calcular_previsao_exata_por_cor(
         
     modo_analise = modo_anterior
 
-    if quantidade_padroes >= 9:
+    if quantidade_padroes >= 10:
 
         # ===== MUDAR PARA FAVOR =====
         if modo_anterior == "CONTRA" and total_loss > total_win:
@@ -657,13 +657,7 @@ def calcular_previsao_exata_por_cor(
 
             print("🔄 LOSS > WIN → Mudando para FAVOR")
 
-            try:
-                with open(caminho_seq, "w", encoding="utf-8") as f:
-                    f.write("[]")
-
-                print("🗑️ seq.csv resetado")
-            except:
-                pass
+            
 
         # ===== VOLTAR PARA CONTRA =====
         elif modo_anterior == "FAVOR" and  total_loss > total_win:
@@ -671,6 +665,14 @@ def calcular_previsao_exata_por_cor(
             modo_analise = "CONTRA"
 
             print("🔄  LOSS > WIN → Voltando para CONTRA")
+            
+            try:
+                with open(caminho_seq, "w", encoding="utf-8") as f:
+                    f.write("[]")
+
+                print("🗑️ seq.csv resetado")
+            except:
+                pass
 
             
 
