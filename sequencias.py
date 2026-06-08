@@ -666,13 +666,7 @@ def calcular_previsao_exata_por_cor(
 
             print("🔄  LOSS > WIN → Voltando para CONTRA")
             
-            try:
-                with open(caminho_seq, "w", encoding="utf-8") as f:
-                    f.write("[]")
-
-                print("🗑️ seq.csv resetado")
-            except:
-                pass
+            
 
             
 
@@ -736,7 +730,7 @@ def calcular_previsao_exata_por_cor(
     # BUSCA SEQUÊNCIA (JANELAS 6,5,4)
     # ==========================================
 
-    janelas_prioridade = [6, 5, 4]
+    janelas_prioridade = [6, 5]
 
     for janela_desejada in janelas_prioridade:
 
