@@ -622,18 +622,18 @@ def calcular_previsao_exata_por_cor(
     except Exception as e:
         print(f"❌ Erro resultados: {e}")
 
-    # ==========================================
+
+   
+     # ==========================================
     # CONTROLE DE MODO POR HORA
     # ==========================================
-
-    quantidade_padroes = len(sequencias_fixas)
-    print(f"📚 Padrões acumulados: {quantidade_padroes}")
 
     arquivo_modo = "modo_analise.txt"
 
     modo_anterior = "FAVOR"
 
     try:
+
         if os.path.exists(arquivo_modo):
 
             with open(
@@ -664,35 +664,40 @@ def calcular_previsao_exata_por_cor(
     modo_analise = modo_anterior
 
     print(
-        f"📊 WIN: {total_win} | LOSS: {total_loss}"
+        f"📊 FECHAMENTO DA HORA -> "
+        f"WIN: {total_win} | LOSS: {total_loss}"
     )
 
     # ==========================================
-    # TROCA SOMENTE SE LOSS > WIN
+    # TROCA DE MODO NO FECHAMENTO DA HORA
     # ==========================================
 
     if total_loss > total_win:
 
-        # ===== MUDAR PARA FAVOR =====
-        if modo_anterior == "CONTRA":
-
-            modo_analise = "FAVOR"
-
-            print(
-                "🔄 LOSS > WIN → Mudando para FAVOR"
-            )
-
-        # ===== VOLTAR PARA CONTRA =====
-        elif modo_anterior == "FAVOR":
+        if modo_anterior == "FAVOR":
 
             modo_analise = "CONTRA"
 
             print(
-                "🔄 LOSS > WIN → Voltando para CONTRA"
+                "🔄 LOSS > WIN → FAVOR para CONTRA"
             )
 
+        else:
+
+            modo_analise = "FAVOR"
+
+            print(
+                "🔄 LOSS > WIN → CONTRA para FAVOR"
+            )
+
+    else:
+
+        print(
+            "✅ WIN >= LOSS → Mantendo modo atual"
+        )
+
     # ==========================================
-    # SALVA MODO ATUAL
+    # SALVA MODO
     # ==========================================
 
     try:
