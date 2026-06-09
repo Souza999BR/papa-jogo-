@@ -3,6 +3,7 @@ from collections import Counter, OrderedDict
 from datetime import datetime, timedelta
 from sequencias import SEQ_HIST_FILE
 
+
 SEQ_PADRAO_FILE = "seq.csv"
 
 
@@ -43,32 +44,144 @@ def filtrar_sequencias_consecutivas(historico):
     return consecutivos if len(consecutivos) >= 4 else []
 
 
-def gerar_padroes(cores, tamanho_min=4, tamanho_max=6, top=10):
+
+def gerar_padroes(
+    cores,
+    tamanho_min=4,
+    tamanho_max=6,
+    top=30
+):
     """
-    Gera padrões que mais se repetem no histórico filtrado.
-    Remove duplicatas e mantém apenas o último padrão encontrado.
+    Gera padrões mais fortes do histórico.
+    Mantém apenas a ocorrência mais recente.
+    Prioriza frequência.
+    Remove padrões fracos.
+    Remove conflitos de saída.
     """
+
     padroes = Counter()
 
-    for t in range(tamanho_min, tamanho_max + 1):
-        for i in range(len(cores) - t):
-            entrada = tuple(cores[i:i + t])   # sequência observada
-            saida = cores[i + t] if i + t < len(cores) else None  # próxima cor
+    # =====================================
+    # LEVANTAMENTO DE PADRÕES
+    # =====================================
+
+    for t in range(
+        tamanho_min,
+        tamanho_max + 1
+    ):
+
+        for i in range(
+            len(cores) - t
+        ):
+
+            entrada = tuple(
+                cores[i:i + t]
+            )
+
+            saida = (
+                cores[i + t]
+                if i + t < len(cores)
+                else None
+            )
+
             if saida:
-                padroes[(entrada, saida)] += 1
 
-    padroes_ordenados = padroes.most_common()
+                padroes[
+                    (entrada, saida)
+                ] += 1
 
-    unicos = OrderedDict()
-    for (entrada, saida), freq in reversed(padroes_ordenados):
-        if entrada not in unicos:
-            unicos[entrada] = (saida, freq)
+    if not padroes:
+        return []
 
-    padroes_filtrados = [((entrada, saida), freq) for entrada, (saida, freq) in unicos.items()]
-    padroes_filtrados.sort(key=lambda x: x[1], reverse=True)
+    # =====================================
+    # ORDENA POR FREQUÊNCIA
+    # =====================================
 
-    return padroes_filtrados[:top]
+    padroes_ordenados = sorted(
+        padroes.items(),
+        key=lambda x: (
+            x[1],
+            len(x[0][0])
+        ),
+        reverse=True
+    )
 
+    # =====================================
+    # MANTÉM SOMENTE A MELHOR SAÍDA
+    # PARA CADA ENTRADA
+    # =====================================
+
+    melhores = {}
+
+    for (
+        entrada,
+        saida
+    ), freq in padroes_ordenados:
+
+        if entrada not in melhores:
+
+            melhores[entrada] = (
+                saida,
+                freq
+            )
+
+    # =====================================
+    # REMOVE PADRÕES FRACOS
+    # =====================================
+
+    padroes_filtrados = []
+
+    for entrada, (
+        saida,
+        freq
+    ) in melhores.items():
+
+        if freq < 2:
+            continue
+
+        padroes_filtrados.append(
+            (
+                (entrada, saida),
+                freq
+            )
+        )
+
+    # =====================================
+    # ORDENA NOVAMENTE
+    # =====================================
+
+    padroes_filtrados.sort(
+        key=lambda x: (
+            x[1],
+            len(x[0][0])
+        ),
+        reverse=True
+    )
+
+    # =====================================
+    # REMOVE DUPLICATAS DE SAÍDA
+    # MANTÉM OS MAIS FORTES
+    # =====================================
+
+    resultado_final = []
+    entradas_usadas = set()
+
+    for item in padroes_filtrados:
+
+        entrada = item[0][0]
+
+        if entrada in entradas_usadas:
+            continue
+
+        entradas_usadas.add(
+            entrada
+        )
+
+        resultado_final.append(
+            item
+        )
+
+    return resultado_final[:top]
 
 def salvar_padroes(padroes):
     """Salva padrões no arquivo seq.csv"""
