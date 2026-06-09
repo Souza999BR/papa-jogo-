@@ -623,7 +623,7 @@ def calcular_previsao_exata_por_cor(
         print(f"❌ Erro resultados: {e}")
 
     # ==========================================
-    # CONTROLE DE MODO (COM 10 PADRÕES)
+    # CONTROLE DE MODO POR HORA
     # ==========================================
 
     quantidade_padroes = len(sequencias_fixas)
@@ -632,51 +632,87 @@ def calcular_previsao_exata_por_cor(
     arquivo_modo = "modo_analise.txt"
 
     modo_anterior = "FAVOR"
-   
 
     try:
         if os.path.exists(arquivo_modo):
-           with open(arquivo_modo, "r", encoding="utf-8") as f:
 
-                valor_salvo = f.read().strip().upper()
+            with open(
+                arquivo_modo,
+                "r",
+                encoding="utf-8"
+            ) as f:
 
-                if valor_salvo in ["CONTRA", "FAVOR"]:
+                valor_salvo = (
+                    f.read()
+                    .strip()
+                    .upper()
+                )
+
+                if valor_salvo in [
+                    "CONTRA",
+                    "FAVOR"
+                ]:
+
                     modo_anterior = valor_salvo
 
     except Exception as erro:
-        print(f"⚠️ Erro ao carregar modo: {erro}")
-        
+
+        print(
+            f"⚠️ Erro ao carregar modo: {erro}"
+        )
+
     modo_analise = modo_anterior
 
-    if quantidade_padroes >= 10:
+    print(
+        f"📊 WIN: {total_win} | LOSS: {total_loss}"
+    )
+
+    # ==========================================
+    # TROCA SOMENTE SE LOSS > WIN
+    # ==========================================
+
+    if total_loss > total_win:
 
         # ===== MUDAR PARA FAVOR =====
-        if modo_anterior == "CONTRA" and total_loss > total_win:
+        if modo_anterior == "CONTRA":
 
             modo_analise = "FAVOR"
 
-            print("🔄 LOSS > WIN → Mudando para FAVOR")
-            
-            
-            
+            print(
+                "🔄 LOSS > WIN → Mudando para FAVOR"
+            )
 
         # ===== VOLTAR PARA CONTRA =====
-        elif modo_anterior == "FAVOR" and  total_loss > total_win:
+        elif modo_anterior == "FAVOR":
 
             modo_analise = "CONTRA"
 
-            print("🔄  LOSS > WIN → Voltando para CONTRA")
-            
-             
+            print(
+                "🔄 LOSS > WIN → Voltando para CONTRA"
+            )
 
-    # salva modo atual
+    # ==========================================
+    # SALVA MODO ATUAL
+    # ==========================================
+
     try:
-        with open(arquivo_modo, "w", encoding="utf-8") as f:
-            f.write(modo_analise)
+
+        with open(
+            arquivo_modo,
+            "w",
+            encoding="utf-8"
+        ) as f:
+
+            f.write(
+                modo_analise
+            )
+
     except:
         pass
 
-    print(f"🧠 Modo análise atual: {modo_analise}")
+    print(
+        f"🧠 Modo análise atual: {modo_analise}"
+    )
 
     # ==========================================
     # RESET POR HORA (RESULTADOS)
