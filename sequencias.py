@@ -624,11 +624,12 @@ def calcular_previsao_exata_por_cor(
 
 
    
-     # ==========================================
+    # ==========================================
     # CONTROLE DE MODO POR HORA
     # ==========================================
 
     arquivo_modo = "modo_analise.txt"
+    arquivo_hora_modo = "ultima_hora_modo.txt"
 
     modo_anterior = "FAVOR"
 
@@ -664,37 +665,83 @@ def calcular_previsao_exata_por_cor(
     modo_analise = modo_anterior
 
     print(
-        f"📊 FECHAMENTO DA HORA -> "
-        f"WIN: {total_win} | LOSS: {total_loss}"
+        f"📊 WIN: {total_win} | LOSS: {total_loss}"
     )
 
     # ==========================================
-    # TROCA DE MODO NO FECHAMENTO DA HORA
+    # TROCA APENAS UMA VEZ POR HORA
     # ==========================================
 
-    if total_loss > total_win:
+    hora_atual_modo = datetime.now().strftime("%Y-%m-%d %H")
 
-        if modo_anterior == "FAVOR":
+    ultima_hora_processada = ""
 
-            modo_analise = "CONTRA"
+    try:
 
-            print(
-                "🔄 LOSS > WIN → FAVOR para CONTRA"
-            )
+        if os.path.exists(
+            arquivo_hora_modo
+        ):
+
+            with open(
+                arquivo_hora_modo,
+                "r",
+                encoding="utf-8"
+            ) as f:
+
+                ultima_hora_processada = (
+                    f.read()
+                    .strip()
+                )
+
+    except Exception as erro:
+
+        print(
+            f"⚠️ Erro lendo hora modo: {erro}"
+        )
+
+    if (
+        hora_atual_modo !=
+        ultima_hora_processada
+    ):
+
+        if total_loss > total_win:
+
+            if modo_anterior == "FAVOR":
+
+                modo_analise = "CONTRA"
+
+                print(
+                    "🔄 LOSS > WIN → FAVOR para CONTRA"
+                )
+
+            else:
+
+                modo_analise = "FAVOR"
+
+                print(
+                    "🔄 LOSS > WIN → CONTRA para FAVOR"
+                )
 
         else:
 
-            modo_analise = "FAVOR"
-
             print(
-                "🔄 LOSS > WIN → CONTRA para FAVOR"
+                "✅ WIN >= LOSS → Mantendo modo atual"
             )
 
-    else:
+        try:
 
-        print(
-            "✅ WIN >= LOSS → Mantendo modo atual"
-        )
+            with open(
+                arquivo_hora_modo,
+                "w",
+                encoding="utf-8"
+            ) as f:
+
+                f.write(
+                    hora_atual_modo
+                )
+
+        except:
+            pass
 
     # ==========================================
     # SALVA MODO
