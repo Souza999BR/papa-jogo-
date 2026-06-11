@@ -817,7 +817,7 @@ def calcular_previsao_exata_por_cor(
     # BUSCA SEQUÊNCIA (JANELAS 6,5,4)
     # ==========================================
 
-    janelas_prioridade = [6, 5]
+    janelas_prioridade = [5]
 
     for janela_desejada in janelas_prioridade:
 

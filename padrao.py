@@ -47,8 +47,8 @@ def filtrar_sequencias_consecutivas(historico):
 
 def gerar_padroes(
     cores,
-    tamanho_min=4,
-    tamanho_max=6,
+    tamanho_min=5,
+    tamanho_max=5,
     top=15
 ):
     """
