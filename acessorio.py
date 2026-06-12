@@ -239,7 +239,7 @@ def prever_proximo_acessorio():
 
     ]:
 
-        if len(historico) < 7:
+        if len(historico) < 10:
             continue
 
         votos = []
@@ -279,7 +279,7 @@ def prever_proximo_acessorio():
                     / len(proximos)
                 )
 
-                if taxa >= 0.75:
+                if taxa >= 0.85:
 
                     votos.extend(
                         [pred] * int(
