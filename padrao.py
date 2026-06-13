@@ -41,7 +41,7 @@ def filtrar_sequencias_consecutivas(historico):
             # quebra a sequência — começa nova
             consecutivos = [historico[i]]
 
-    return consecutivos if len(consecutivos) >= 4 else []
+    return consecutivos if len(consecutivos) >= 10 else []
 
 
 
@@ -49,7 +49,7 @@ def gerar_padroes(
     cores,
     tamanho_min=5,
     tamanho_max=5,
-    top=10
+    top=12
 ):
     """
     Gera padrões mais fortes do histórico.
@@ -201,7 +201,7 @@ if __name__ == "__main__":
     historico_completo = carregar_historico()
     historico_consecutivo = filtrar_sequencias_consecutivas(historico_completo)
 
-    if len(historico_consecutivo) < 4:
+    if len(historico_consecutivo) < 10:
         print("⚠️ Nenhuma sequência consecutiva suficiente encontrada.")
     else:
         # pega apenas as cores do histórico filtrado

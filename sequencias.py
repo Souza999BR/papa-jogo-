@@ -910,16 +910,16 @@ def calcular_previsao_exata(
 
         sequencia_valida.append(item)
 
-        if len(sequencia_valida) < 4:
+        if len(sequencia_valida) < 10:
             continue
 
         if not horarios_sao_consecutivos(
-            sequencia_valida[-4:]
+            sequencia_valida[-10:]
         ):
 
             sequencia_valida.pop(0)
 
-    if len(sequencia_valida) < 8:
+    if len(sequencia_valida) < 10:
 
         print(
             "⚠️ Nenhuma sequência consecutiva suficiente encontrada."
