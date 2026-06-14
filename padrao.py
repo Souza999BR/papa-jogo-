@@ -49,7 +49,7 @@ def gerar_padroes(
     cores,
     tamanho_min=4,
     tamanho_max=6,
-    top=15
+    top=10
 ):
     """
     Gera padrões mais fortes do histórico.
