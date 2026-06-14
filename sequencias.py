@@ -814,7 +814,7 @@ def calcular_previsao_exata_por_cor(
         print(f"❌ Erro reset hora: {e}")
 
     # ==========================================
-    # BUSCA SEQUÊNCIA (JANELAS 6,5,4)
+    # BUSCA SEQUÊNCIA (JANELAS 5)
     # ==========================================
 
     janelas_prioridade = [5]

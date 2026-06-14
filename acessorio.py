@@ -239,15 +239,19 @@ def prever_proximo_acessorio():
 
     ]:
 
-        if len(historico) < 10:
+        if len(historico) < 7:
             continue
 
         votos = []
+
+        predicoes_janelas = []
+
         pesos = {
+
             6: 6,
             5: 5,
-            4:4
-                    
+            4: 4
+
         }
 
         for janela in [6, 5, 4]:
@@ -281,6 +285,10 @@ def prever_proximo_acessorio():
 
                 if taxa >= 0.85:
 
+                    predicoes_janelas.append(
+                        pred
+                    )
+
                     votos.extend(
                         [pred] * int(
                             taxa *
@@ -288,6 +296,16 @@ def prever_proximo_acessorio():
                             10
                         )
                     )
+
+        # =====================================================
+        # CONSENSO ENTRE JANELAS
+        # =====================================================
+
+        if len(predicoes_janelas) < 2:
+            continue
+
+        if len(set(predicoes_janelas)) != 1:
+            continue
 
         if votos:
 
@@ -303,10 +321,16 @@ def prever_proximo_acessorio():
                 / len(votos)
             ) * 100
 
-            resultados[cor_nome] = (
-                acessorio,
-                confianca
-            )
+            # =================================================
+            # FILTRO DE CONFIANÇA
+            # =================================================
+
+            if confianca >= 80:
+
+                resultados[cor_nome] = (
+                    acessorio,
+                    confianca
+                )
 
     if not resultados:
 
