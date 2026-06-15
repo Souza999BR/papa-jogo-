@@ -321,17 +321,15 @@ async def enviar_previsao(
     horario = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # =====================================================
-    # REGRA PRINCIPAL:
-    # CÓDIGO TEM PRIORIDADE SOBRE ACESSÓRIO
+    # CARREGA MODO (FAVOR / CONTRA)
     # =====================================================
-    usar_acessorio = True
+    modo_analise = "FAVOR"
 
-    if (
-        codigo_previsto
-        and confianca is not None
-        and confianca >= 0.85
-    ):
-        usar_acessorio = False
+    try:
+        with open("modo_analise.txt", "r", encoding="utf-8") as f:
+            modo_analise = f.read().strip().upper()
+    except:
+        pass
 
     # =====================================================
     # NORMALIZA COR
@@ -340,38 +338,61 @@ async def enviar_previsao(
         cor_prevista["cor"]
         if isinstance(cor_prevista, dict)
         else cor_prevista
-    )
+    ).upper()
+
+    # =====================================================
+    # APLICA MODO (FAVOR / CONTRA)
+    # =====================================================
+    if modo_analise == "CONTRA":
+        cor_base = (
+            "VERMELHO"
+            if cor_base == "AZUL"
+            else "AZUL"
+        )
+
+    # =====================================================
+    # REGRA PRINCIPAL:
+    # ACESSÓRIO SÓ ENTRA COM ALTA CONFIANÇA
+    # =====================================================
+    usar_acessorio = False
+
+    if (
+        acessorio
+        and confianca is not None
+        and confianca >= 0.85
+    ):
+        usar_acessorio = True
 
     # =====================================================
     # IMAGEM
     # =====================================================
     img_url = None
 
-    if usar_acessorio and acessorio:
+    if usar_acessorio:
 
         try:
 
             acessorio = acessorio.upper()
 
-            if cor_base.upper() == "AZUL":
+            if cor_base == "AZUL":
 
                 if acessorio in CODIGOS_AZUL:
 
                     codigo_img = CODIGOS_AZUL[acessorio][0]
 
                     img_url = (
-                        f"https://www.pa3333.com/static/game/"
+                        "https://www.pa3333.com/static/game/"
                         f"{codigo_img}.png"
                     )
 
-            elif cor_base.upper() == "VERMELHO":
+            elif cor_base == "VERMELHO":
 
                 if acessorio in CODIGOS_VERMELHO:
 
                     codigo_img = CODIGOS_VERMELHO[acessorio][0]
 
                     img_url = (
-                        f"https://www.pa3333.com/static/game/"
+                        "https://www.pa3333.com/static/game/"
                         f"{codigo_img}.png"
                     )
 
@@ -379,7 +400,7 @@ async def enviar_previsao(
             print(f"⚠️ Erro imagem acessório: {erro}")
 
     # =====================================================
-    # FALLBACK PARA IMAGEM NORMAL DA COR
+    # FALLBACK IMAGEM COR
     # =====================================================
     if not img_url:
         img_url = escolher_imagem_exata(cor_base)
@@ -388,6 +409,7 @@ async def enviar_previsao(
     # DEBUG
     # =====================================================
     print(f"DEBUG cor = {cor_base}")
+    print(f"DEBUG modo = {modo_analise}")
     print(f"DEBUG codigo_previsto = {codigo_previsto}")
     print(f"DEBUG confianca = {confianca}")
     print(f"DEBUG acessorio = {acessorio}")
@@ -404,6 +426,7 @@ async def enviar_previsao(
 
     mensagem = (
         f"⏰ {horario}\n"
+        f"📊 Modo: {modo_analise}\n"
         f"{linha_previsao}"
     )
 
