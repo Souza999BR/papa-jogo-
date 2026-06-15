@@ -334,32 +334,28 @@ async def enviar_previsao(
     # =====================================================
     # NORMALIZA COR
     # =====================================================
-    cor_base = (
-        cor_prevista["cor"]
-        if isinstance(cor_prevista, dict)
-        else cor_prevista
-    ).upper()
+    if isinstance(cor_prevista, dict):
+        cor_base = cor_prevista.get("cor", "AZUL")
+    else:
+        cor_base = str(cor_prevista)
+
+    cor_base = cor_base.strip().upper()
 
     # =====================================================
     # APLICA MODO (FAVOR / CONTRA)
     # =====================================================
     if modo_analise == "CONTRA":
-        cor_base = (
-            "VERMELHO"
-            if cor_base == "AZUL"
-            else "AZUL"
-        )
+        cor_base = "VERMELHO" if cor_base == "AZUL" else "AZUL"
 
     # =====================================================
-    # REGRA PRINCIPAL:
-    # ACESSÓRIO SÓ ENTRA COM ALTA CONFIANÇA
+    # REGRA DO ACESSÓRIO (SÓ ENTRA COM ALTA CONFIANÇA)
     # =====================================================
     usar_acessorio = False
 
     if (
         acessorio
         and confianca is not None
-        and confianca >= 0.85
+        and float(confianca) >= 0.85
     ):
         usar_acessorio = True
 
@@ -372,29 +368,15 @@ async def enviar_previsao(
 
         try:
 
-            acessorio = acessorio.upper()
+            acessorio = str(acessorio).upper()
 
-            if cor_base == "AZUL":
+            if cor_base == "AZUL" and acessorio in CODIGOS_AZUL:
+                codigo_img = CODIGOS_AZUL[acessorio][0]
+                img_url = f"https://www.pa3333.com/static/game/{codigo_img}.png"
 
-                if acessorio in CODIGOS_AZUL:
-
-                    codigo_img = CODIGOS_AZUL[acessorio][0]
-
-                    img_url = (
-                        "https://www.pa3333.com/static/game/"
-                        f"{codigo_img}.png"
-                    )
-
-            elif cor_base == "VERMELHO":
-
-                if acessorio in CODIGOS_VERMELHO:
-
-                    codigo_img = CODIGOS_VERMELHO[acessorio][0]
-
-                    img_url = (
-                        "https://www.pa3333.com/static/game/"
-                        f"{codigo_img}.png"
-                    )
+            elif cor_base == "VERMELHO" and acessorio in CODIGOS_VERMELHO:
+                codigo_img = CODIGOS_VERMELHO[acessorio][0]
+                img_url = f"https://www.pa3333.com/static/game/{codigo_img}.png"
 
         except Exception as erro:
             print(f"⚠️ Erro imagem acessório: {erro}")
@@ -417,11 +399,11 @@ async def enviar_previsao(
     print(f"DEBUG img_url = {img_url}")
 
     # =====================================================
-    # MENSAGEM BASE
+    # MENSAGEM
     # =====================================================
     linha_previsao = f"🎯 Próxima previsão: {cor_base}"
 
-    if usar_acessorio and acessorio:
+    if usar_acessorio:
         linha_previsao += f" | ACESSÓRIO: {acessorio}"
 
     mensagem = (
@@ -440,7 +422,10 @@ async def enviar_previsao(
     # CONFIANÇA
     # =====================================================
     if confianca is not None:
-        mensagem += f"\n📊 Confiança: {confianca:.1%}"
+        try:
+            mensagem += f"\n📊 Confiança: {float(confianca):.1%}"
+        except:
+            mensagem += f"\n📊 Confiança: {confianca}"
 
     # =====================================================
     # ENVIO
@@ -448,15 +433,12 @@ async def enviar_previsao(
     try:
 
         if img_url:
-
             await bot.send_photo(
                 chat_id=CHAT_ID,
                 photo=img_url,
                 caption=mensagem
             )
-
         else:
-
             await bot.send_message(
                 chat_id=CHAT_ID,
                 text=mensagem
@@ -466,7 +448,7 @@ async def enviar_previsao(
 
     except Exception as e:
         print(f"⚠️ Erro previsão: {e}")
-
+        
 # =========================================================
 # RESULTADO
 # =========================================================
@@ -765,73 +747,49 @@ async def loop_previsoes():
 
             # ================= RESET BOT =================
             if agora.hour != ultima_hora_reset:
-
                 ultima_hora_reset = agora.hour
-
                 await resetar_bot()
 
-            # ================= RELATÓRIO POR HORA =================
+            # ================= RELATÓRIO =================
             if "ultima_hora_relatorio" not in globals():
                 ultima_hora_relatorio = agora.hour
 
             if agora.hour != ultima_hora_relatorio:
 
-                print(f"📊 Enviando relatório da hora {ultima_hora_relatorio:02d}...")
-
                 if resultados:
-
                     await enviar_relatorio()
                     resultados.clear()
 
                 ultima_hora_relatorio = agora.hour
 
-            # =====================================================
-            # COLETA FINAL DAS APOSTAS (57~59 SEGUNDOS)
-            # =====================================================
-            segundos = agora.second
-
-            if segundos >= 57:
-
-                print("📊 Coletando apostas finais do minuto...")
-
-                pegar_valores_apostas()
-
             # ================= RESULTADO =================
             resultado = pegar_ultima_cor()
 
             if not resultado:
-
                 await asyncio.sleep(5)
                 continue
 
             cor_atual, codigo_atual = resultado
 
             if cor_atual not in ["AZUL", "VERMELHO"]:
-
                 await asyncio.sleep(5)
                 continue
 
             salvar_historico(cor_atual, codigo_atual)
 
-            # ================= HISTÓRICO TENDÊNCIA =================
             historico_tendencia.append(
-                (
-                    agora.strftime("%Y-%m-%d %H:%M:%S"),
-                    cor_atual,
-                    codigo_atual
-                )
+                (agora.strftime("%Y-%m-%d %H:%M:%S"), cor_atual, codigo_atual)
             )
 
             historico_tendencia = historico_tendencia[-60:]
 
             historico = carregar_historico_completo()
 
-            # ================= VALIDAR =================
+            # ================= VALIDAÇÃO =================
             if ultima_previsao:
 
-                hora_ref = (agora - timedelta(minutes=1)).strftime("%H:%M")
                 cor_esperada = ultima_previsao[0]
-                # CORRIGE QUANDO A PREVISÃO VEM COMO DICT
+
                 if isinstance(cor_esperada, dict):
                     cor_esperada = cor_esperada.get("cor", "DESCONHECIDO")
 
@@ -839,128 +797,73 @@ async def loop_previsoes():
 
                 await enviar_resultado(acertou)
 
-                resultados.append(
-                    (cor_esperada, hora_ref, acertou)
-                )
-                
-                # ================= VALIDAÇÃO ACESSÓRIO =================
+                resultados.append((cor_esperada, agora.strftime("%H:%M"), acertou))
+
                 try:
                     processar_validacao_acessorio()
                 except Exception as e:
                     print(f"⚠️ Erro validação acessório: {e}")
 
-                # ================= SALVAR CSV =================
-                try:
-
-                    arquivo_resultados = "resultados.csv"
-
-                    if not os.path.exists(arquivo_resultados):
-                        with open(arquivo_resultados, "w", newline="", encoding="utf-8") as f:
-                            writer = csv.writer(f)
-                            writer.writerow(["Timestamp", "Cor", "Horario", "Resultado"])
-
-                    with open(arquivo_resultados, "a", newline="", encoding="utf-8") as f:
-                        writer = csv.writer(f)
-                        writer.writerow([
-                            agora.strftime("%Y-%m-%d %H:%M:%S"),
-                            cor_esperada,
-                            hora_ref,
-                            "WIN" if acertou else "LOSS"
-                        ])
-
-                except Exception as e:
-                    print(f"⚠️ Erro salvando resultado: {e}")
-
                 ultima_previsao = None
 
-            # ================= PREVISÃO =================
+            # ================= PREVISÃO BASE =================
             previsao_cor = None
             previsao_codigo = None
             confianca = None
 
-            # =====================================================
-            # 1 - ANÁLISE POR PRESSÃO DAS APOSTAS
-            # =====================================================
+            # 1 - PRESSÃO
             resultado_pressao = calcular_pressao_apostas()
 
             if resultado_pressao:
-
                 cor_pressao = resultado_pressao.get("cor")
-                forca_pressao = resultado_pressao.get("forca")
+                forca = resultado_pressao.get("forca")
 
                 if cor_pressao in ["AZUL", "VERMELHO"]:
-
                     previsao_cor = cor_pressao
-                    confianca = min(forca_pressao / 1000, 0.99)
+                    confianca = min(forca / 1000, 0.99)
 
-            # =====================================================
-            # 2 - PREVISÃO POR CÓDIGO
-            # =====================================================
+            # 2 - CÓDIGO (PRIORIDADE MAIS FORTE)
             resultado_codigo = calcular_previsao_exata(historico)
 
             if resultado_codigo:
-
                 codigo_prev, cor_prev, confianca_prev = resultado_codigo
 
-                if previsao_cor:
-
-                    if cor_prev == previsao_cor:
-
-                        previsao_codigo = codigo_prev
-                        confianca = max(confianca or 0, confianca_prev)
-
-                else:
-
+                if not previsao_cor:
                     previsao_cor = cor_prev
-                    previsao_codigo = codigo_prev
-                    confianca = confianca_prev
 
-            # =====================================================
-            # 3 - COR
-            # =====================================================
+                previsao_codigo = codigo_prev
+                confianca = confianca_prev
+
+            # 3 - COR FINAL
             resultado_cor = calcular_previsao_exata_por_cor(historico)
 
             if resultado_cor and not previsao_cor:
                 previsao_cor = resultado_cor
 
-            # =====================================================
-            # ENVIO FINAL
-            # =====================================================
-            if previsao_cor:
+            # ================= ACESSÓRIO (SEPARADO DO CÓDIGO) =================
+            acessorio_previsto = None
 
-                # ================= ACESSÓRIO (CONDICIONAL) =================
-                acessorio_previsto = None
+            if previsao_cor:
 
                 try:
 
-                    usar_acessorio = True
+                    resultado_acessorio = prever_proximo_acessorio()
 
-                    if (
-                        previsao_codigo
-                        and confianca is not None
-                        and confianca >= 0.74
-                    ):
-                        usar_acessorio = False
+                    if resultado_acessorio:
 
-                        print(
-                            f"🔑 Código forte detectado "
-                            f"({confianca:.1%}) - acessório bloqueado"
-                        )
+                        conf_acc = resultado_acessorio.get("confianca", 0)
 
-                    if usar_acessorio:
-
-                        resultado_acessorio = prever_proximo_acessorio()
-
-                        print(f"DEBUG ACESSÓRIO: {resultado_acessorio}")
-
-                        if resultado_acessorio:
-
+                        if conf_acc >= 85:   # 🔥 REGRA ÚNICA E LIMPA
                             acessorio_previsto = resultado_acessorio.get("acessorio")
 
-                            print(f"🎩 Acessório previsto: {acessorio_previsto}")
+                        else:
+                            print(f"⚠️ Acessório ignorado ({conf_acc:.2f}%)")
 
                 except Exception as e:
-                    print(f"⚠️ Erro previsão acessório: {e}")
+                    print(f"⚠️ Erro acessório: {e}")
+
+            # ================= SALVA PREVISÃO =================
+            if previsao_cor:
 
                 ultima_previsao = (previsao_cor, previsao_codigo)
 
@@ -990,6 +893,7 @@ async def loop_previsoes():
         except Exception as e:
             print(f"❌ Erro loop: {e}")
             await asyncio.sleep(5)
+            
 # =========================================================
 # MAIN
 # =========================================================

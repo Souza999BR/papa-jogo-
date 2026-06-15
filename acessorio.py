@@ -21,8 +21,6 @@ ultimo_reset_hora = None
 CACHE_PADROES = {}
 PESOS_DINAMICOS = defaultdict(lambda: 1.0)
 
-PROBABILIDADES = defaultdict(lambda: defaultdict(lambda: 1))
-
 
 # =========================================================
 # MAPA POR COR (IMAGENS)
@@ -81,12 +79,11 @@ CODIGOS_VERMELHO = {
 }
 
 # =========================================================
-# RESET POR HORA
+# RESET
 # =========================================================
 
 def resetar_por_hora(caminho_resultados):
-    global ultimo_reset_hora
-    global acessorio_wins, acessorio_loss
+    global ultimo_reset_hora, acessorio_wins, acessorio_loss
     global ultima_previsao_acessorio, ultimo_codigo_processado
 
     agora = datetime.now().hour
@@ -96,21 +93,19 @@ def resetar_por_hora(caminho_resultados):
 
     ultimo_reset_hora = agora
 
-    print("⏰ RESET DE HORA EXECUTADO")
-
-    with open(caminho_resultados, "w", encoding="utf-8") as f:
-        f.write("resultado\n")
-
     acessorio_wins = 0
     acessorio_loss = 0
     ultima_previsao_acessorio = None
     ultimo_codigo_processado = None
 
-    print("🗑️ Estatísticas resetadas")
+    with open(caminho_resultados, "w", encoding="utf-8") as f:
+        f.write("resultado\n")
+
+    print("⏰ RESET ACESSÓRIO OK")
 
 
 # =========================================================
-# IDENTIFICAR COR + ACESSÓRIO
+# IDENTIFICAR
 # =========================================================
 
 def identificar_cor_acessorio(codigo):
@@ -129,12 +124,11 @@ def identificar_cor_acessorio(codigo):
 # =========================================================
 
 def carregar_historico(csv_file="sequencias.csv"):
-    historico_azul = []
-    historico_vermelho = []
+    azul, vermelho = [], []
 
     try:
-        with open(csv_file, "r", encoding="utf-8") as file:
-            reader = list(csv.DictReader(file))
+        with open(csv_file, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
 
             for row in reader:
                 codigo = row.get("Codigo", "").strip().upper()
@@ -147,32 +141,31 @@ def carregar_historico(csv_file="sequencias.csv"):
                     continue
 
                 if cor == "AZUL":
-                    historico_azul.append(acessorio)
+                    azul.append(acessorio)
                 else:
-                    historico_vermelho.append(acessorio)
+                    vermelho.append(acessorio)
 
     except Exception as e:
-        print(f"⚠️ Erro CSV: {e}")
+        print("⚠️ CSV erro:", e)
 
-    return historico_azul, historico_vermelho
+    return azul, vermelho
 
 
 # =========================================================
-# CACHE DE PADRÕES
+# PADRÕES
 # =========================================================
 
-def gerar_padroes_cache(historico, janela):
-    key = (tuple(historico), janela)
+def gerar_padroes_cache(hist, janela):
+    key = (tuple(hist), janela)
 
     if key in CACHE_PADROES:
         return CACHE_PADROES[key]
 
     padroes = {}
 
-    for i in range(len(historico) - janela):
-        seq = tuple(historico[i:i + janela])
-        prox = historico[i + janela]
-
+    for i in range(len(hist) - janela):
+        seq = tuple(hist[i:i + janela])
+        prox = hist[i + janela]
         padroes.setdefault(seq, []).append(prox)
 
     CACHE_PADROES[key] = padroes
@@ -180,35 +173,17 @@ def gerar_padroes_cache(historico, janela):
 
 
 # =========================================================
-# BAYES SIMPLES
+# BAYES
 # =========================================================
 
 def bayes_probabilidade(seq, proximos):
     cont = Counter(proximos)
     total = sum(cont.values())
-
     return {k: v / total for k, v in cont.items()}
 
 
 # =========================================================
-# DASHBOARD
-# =========================================================
-
-def dashboard(cor, acessorio, confianca):
-    total = acessorio_wins + acessorio_loss
-    taxa = (acessorio_wins / total * 100) if total else 0
-
-    print("\n================ DASHBOARD ================")
-    print(f"COR: {cor}")
-    print(f"PREVISÃO: {acessorio}")
-    print(f"CONFIANÇA: {confianca:.2f}%")
-    print(f"WINS: {acessorio_wins} | LOSS: {acessorio_loss}")
-    print(f"ACURÁCIA: {taxa:.2f}%")
-    print("===========================================\n")
-
-
-# =========================================================
-# PREVISÃO PRINCIPAL
+# PREVISÃO
 # =========================================================
 
 def prever_proximo_acessorio():
@@ -217,7 +192,10 @@ def prever_proximo_acessorio():
     historico_azul, historico_vermelho = carregar_historico()
     resultados = {}
 
-    for cor_nome, historico in [("AZUL", historico_azul), ("VERMELHO", historico_vermelho)]:
+    for cor_nome, historico in [
+        ("AZUL", historico_azul),
+        ("VERMELHO", historico_vermelho)
+    ]:
 
         if len(historico) < 10:
             continue
@@ -243,16 +221,13 @@ def prever_proximo_acessorio():
             pred = max(probs, key=probs.get)
             taxa = probs[pred]
 
-            peso_dinamico = PESOS_DINAMICOS[(cor_nome, pred)]
+            peso = PESOS_DINAMICOS[(cor_nome, pred)]
 
             if taxa >= 0.60:
                 predicoes_janelas.append(pred)
-                votos.extend([pred] * int(taxa * pesos_base[janela] * peso_dinamico * 10))
+                votos.extend([pred] * int(taxa * pesos_base[janela] * peso * 10))
 
         if len(predicoes_janelas) < 2:
-            continue
-
-        if len(set(predicoes_janelas)) != 1:
             continue
 
         if not votos:
@@ -260,6 +235,7 @@ def prever_proximo_acessorio():
 
         final = Counter(votos)
         acessorio = final.most_common(1)[0][0]
+
         confianca = (final[acessorio] / sum(final.values())) * 100
 
         if confianca >= 70:
@@ -274,25 +250,27 @@ def prever_proximo_acessorio():
     ultima_previsao_acessorio = acessorio
     ultima_confianca_acessorio = confianca
 
-    dashboard(cor, acessorio, confianca)
+    print(f"🎯 PREVISÃO ACESSÓRIO: {cor} | {acessorio} | {confianca:.2f}%")
 
-    return {"cor": cor, "acessorio": acessorio, "confianca": round(confianca, 2)}
+    return {
+        "cor": cor,
+        "acessorio": acessorio,
+        "confianca": round(confianca, 2)
+    }
 
 
 # =========================================================
-# VALIDAÇÃO (SÓ >= 85%)
+# VALIDAÇÃO (SEM BUG DE cor_nome)
 # =========================================================
 
 def processar_validacao_acessorio():
     global acessorio_wins, acessorio_loss
     global ultima_previsao_acessorio, ultimo_codigo_processado
-    global PESOS_DINAMICOS, ultima_confianca_acessorio
+    global ultima_confianca_acessorio
 
     try:
         with open("sequencias.csv", "r", encoding="utf-8") as f:
             reader = list(csv.DictReader(f))
-            if not reader:
-                return
             codigo_real = reader[-1].get("Codigo", "").strip().upper()
     except:
         return
@@ -307,23 +285,13 @@ def processar_validacao_acessorio():
     if acessorio_real == "DESCONHECIDO" or not ultima_previsao_acessorio:
         return
 
-    # 🔥 REGRA PRINCIPAL
     if ultima_confianca_acessorio < 85:
-        print(f"⚠️ Ignorado (<85%): {ultima_confianca_acessorio:.2f}%")
         return
-
-    print(f"🎩 Previsto: {ultima_previsao_acessorio}")
-    print(f"🎩 Real: {acessorio_real}")
-    print(f"📊 Confiança: {ultima_confianca_acessorio:.2f}%")
 
     if acessorio_real == ultima_previsao_acessorio:
         acessorio_wins += 1
-        PESOS_DINAMICOS[("AZUL", acessorio_real)] += 0.05
-        print(f"✅ WIN ({acessorio_wins})")
     else:
         acessorio_loss += 1
-        PESOS_DINAMICOS[("AZUL", acessorio_real)] -= 0.02
-        print(f"❌ LOSS ({acessorio_loss})")
 
 
 # =========================================================
