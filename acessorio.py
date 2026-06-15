@@ -10,6 +10,7 @@ acessorio_wins = 0
 acessorio_loss = 0
 
 ultima_previsao_acessorio = None
+ultima_confianca_acessorio = 0
 ultimo_codigo_processado = None
 ultimo_reset_hora = None
 
@@ -157,7 +158,7 @@ def carregar_historico(csv_file="sequencias.csv"):
 
 
 # =========================================================
-# CACHE DE PADRÕES (⚡ MAIS RÁPIDO)
+# CACHE DE PADRÕES
 # =========================================================
 
 def gerar_padroes_cache(historico, janela):
@@ -179,19 +180,14 @@ def gerar_padroes_cache(historico, janela):
 
 
 # =========================================================
-# BAYES SIMPLES (🧠 INTELIGÊNCIA)
+# BAYES SIMPLES
 # =========================================================
 
 def bayes_probabilidade(seq, proximos):
     cont = Counter(proximos)
-
     total = sum(cont.values())
 
-    probs = {}
-    for k, v in cont.items():
-        probs[k] = v / total
-
-    return probs
+    return {k: v / total for k, v in cont.items()}
 
 
 # =========================================================
@@ -216,10 +212,9 @@ def dashboard(cor, acessorio, confianca):
 # =========================================================
 
 def prever_proximo_acessorio():
-    global ultima_previsao_acessorio
+    global ultima_previsao_acessorio, ultima_confianca_acessorio
 
     historico_azul, historico_vermelho = carregar_historico()
-
     resultados = {}
 
     for cor_nome, historico in [("AZUL", historico_azul), ("VERMELHO", historico_vermelho)]:
@@ -229,7 +224,6 @@ def prever_proximo_acessorio():
 
         votos = []
         predicoes_janelas = []
-
         pesos_base = {6: 1.5, 5: 1.2, 4: 1.0}
 
         for janela in [6, 5, 4]:
@@ -244,19 +238,15 @@ def prever_proximo_acessorio():
                 continue
 
             proximos = padroes[seq]
-
             probs = bayes_probabilidade(seq, proximos)
 
             pred = max(probs, key=probs.get)
             taxa = probs[pred]
 
-            # pesos dinâmicos (aprendem com histórico)
             peso_dinamico = PESOS_DINAMICOS[(cor_nome, pred)]
 
             if taxa >= 0.60:
-
                 predicoes_janelas.append(pred)
-
                 votos.extend([pred] * int(taxa * pesos_base[janela] * peso_dinamico * 10))
 
         if len(predicoes_janelas) < 2:
@@ -270,7 +260,6 @@ def prever_proximo_acessorio():
 
         final = Counter(votos)
         acessorio = final.most_common(1)[0][0]
-
         confianca = (final[acessorio] / sum(final.values())) * 100
 
         if confianca >= 70:
@@ -283,34 +272,28 @@ def prever_proximo_acessorio():
     cor, (acessorio, confianca) = max(resultados.items(), key=lambda x: x[1][1])
 
     ultima_previsao_acessorio = acessorio
+    ultima_confianca_acessorio = confianca
 
     dashboard(cor, acessorio, confianca)
 
-    return {
-        "cor": cor,
-        "acessorio": acessorio,
-        "confianca": round(confianca, 2)
-    }
+    return {"cor": cor, "acessorio": acessorio, "confianca": round(confianca, 2)}
 
 
 # =========================================================
-# VALIDAÇÃO + APRENDIZADO
+# VALIDAÇÃO (SÓ >= 85%)
 # =========================================================
 
 def processar_validacao_acessorio():
     global acessorio_wins, acessorio_loss
     global ultima_previsao_acessorio, ultimo_codigo_processado
-    global PESOS_DINAMICOS
+    global PESOS_DINAMICOS, ultima_confianca_acessorio
 
     try:
         with open("sequencias.csv", "r", encoding="utf-8") as f:
             reader = list(csv.DictReader(f))
-
             if not reader:
                 return
-
             codigo_real = reader[-1].get("Codigo", "").strip().upper()
-
     except:
         return
 
@@ -324,8 +307,14 @@ def processar_validacao_acessorio():
     if acessorio_real == "DESCONHECIDO" or not ultima_previsao_acessorio:
         return
 
+    # 🔥 REGRA PRINCIPAL
+    if ultima_confianca_acessorio < 85:
+        print(f"⚠️ Ignorado (<85%): {ultima_confianca_acessorio:.2f}%")
+        return
+
     print(f"🎩 Previsto: {ultima_previsao_acessorio}")
     print(f"🎩 Real: {acessorio_real}")
+    print(f"📊 Confiança: {ultima_confianca_acessorio:.2f}%")
 
     if acessorio_real == ultima_previsao_acessorio:
         acessorio_wins += 1
@@ -343,7 +332,6 @@ def processar_validacao_acessorio():
 
 def obter_resultado_acessorio():
     total = acessorio_wins + acessorio_loss
-
     taxa = (acessorio_wins / total * 100) if total else 0
 
     return {
