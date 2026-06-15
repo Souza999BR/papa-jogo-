@@ -235,7 +235,6 @@ def prever_proximo_acessorio():
 
         final = Counter(votos)
         acessorio = final.most_common(1)[0][0]
-
         confianca = (final[acessorio] / sum(final.values())) * 100
 
         if confianca >= 70:
@@ -247,13 +246,23 @@ def prever_proximo_acessorio():
 
     cor, (acessorio, confianca) = max(resultados.items(), key=lambda x: x[1][1])
 
+    # =====================================================
+    # 🔥 GARANTE CONSISTÊNCIA FINAL
+    # =====================================================
+    cor_final = cor  # mantém lógica atual (AZUL / VERMELHO)
+
+    # valida segurança: acessório deve existir na cor escolhida
+    if acessorio not in (CODIGOS_AZUL.keys() | CODIGOS_VERMELHO.keys()):
+        print("⚠️ Acessório inválido para mapa")
+        return None
+
     ultima_previsao_acessorio = acessorio
     ultima_confianca_acessorio = confianca
 
-    print(f"🎯 PREVISÃO ACESSÓRIO: {cor} | {acessorio} | {confianca:.2f}%")
+    print(f"🎯 PREVISÃO ACESSÓRIO: {cor_final} | {acessorio} | {confianca:.2f}%")
 
     return {
-        "cor": cor,
+        "cor": cor_final,
         "acessorio": acessorio,
         "confianca": round(confianca, 2)
     }

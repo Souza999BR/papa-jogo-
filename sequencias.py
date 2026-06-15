@@ -622,8 +622,6 @@ def calcular_previsao_exata_por_cor(
     except Exception as e:
         print(f"❌ Erro resultados: {e}")
 
-
-   
     # ==========================================
     # CONTROLE DE MODO POR HORA
     # ==========================================
@@ -634,144 +632,67 @@ def calcular_previsao_exata_por_cor(
     modo_anterior = "FAVOR"
 
     try:
-
         if os.path.exists(arquivo_modo):
+            with open(arquivo_modo, "r", encoding="utf-8") as f:
+                valor_salvo = f.read().strip().upper()
 
-            with open(
-                arquivo_modo,
-                "r",
-                encoding="utf-8"
-            ) as f:
-
-                valor_salvo = (
-                    f.read()
-                    .strip()
-                    .upper()
-                )
-
-                if valor_salvo in [
-                    "CONTRA",
-                    "FAVOR"
-                ]:
-
+                if valor_salvo in ["CONTRA", "FAVOR"]:
                     modo_anterior = valor_salvo
 
     except Exception as erro:
-
-        print(
-            f"⚠️ Erro ao carregar modo: {erro}"
-        )
+        print(f"⚠️ Erro ao carregar modo: {erro}")
 
     modo_analise = modo_anterior
 
-    print(
-        f"📊 WIN: {total_win} | LOSS: {total_loss}"
-    )
+    print(f"🧠 Modo análise atual: {modo_analise}")
 
     # ==========================================
     # TROCA APENAS UMA VEZ POR HORA
     # ==========================================
 
     hora_atual_modo = datetime.now().strftime("%Y-%m-%d %H")
-
     ultima_hora_processada = ""
 
     try:
-
-        if os.path.exists(
-            arquivo_hora_modo
-        ):
-
-            with open(
-                arquivo_hora_modo,
-                "r",
-                encoding="utf-8"
-            ) as f:
-
-                ultima_hora_processada = (
-                    f.read()
-                    .strip()
-                )
+        if os.path.exists(arquivo_hora_modo):
+            with open(arquivo_hora_modo, "r", encoding="utf-8") as f:
+                ultima_hora_processada = f.read().strip()
 
     except Exception as erro:
+        print(f"⚠️ Erro lendo hora modo: {erro}")
 
-        print(
-            f"⚠️ Erro lendo hora modo: {erro}"
-        )
-
-    if (
-        hora_atual_modo !=
-        ultima_hora_processada
-    ):
+    if hora_atual_modo != ultima_hora_processada:
 
         if total_loss > total_win:
 
             if modo_anterior == "FAVOR":
-
                 modo_analise = "CONTRA"
-
-                print(
-                    "🔄 LOSS > WIN → FAVOR para CONTRA"
-                )
-
+                print("🔄 LOSS > WIN → FAVOR para CONTRA")
             else:
-
                 modo_analise = "FAVOR"
-
-                print(
-                    "🔄 LOSS > WIN → CONTRA para FAVOR"
-                )
+                print("🔄 LOSS > WIN → CONTRA para FAVOR")
 
         else:
-
-            print(
-                "✅ WIN >= LOSS → Mantendo modo atual"
-            )
+            print("✅ WIN >= LOSS → Mantendo modo atual")
 
         try:
-
-            with open(
-                arquivo_hora_modo,
-                "w",
-                encoding="utf-8"
-            ) as f:
-
-                f.write(
-                    hora_atual_modo
-                )
-
+            with open(arquivo_hora_modo, "w", encoding="utf-8") as f:
+                f.write(hora_atual_modo)
         except:
             pass
 
-    # ==========================================
-    # SALVA MODO
-    # ==========================================
-
+    # salvar modo
     try:
-
-        with open(
-            arquivo_modo,
-            "w",
-            encoding="utf-8"
-        ) as f:
-
-            f.write(
-                modo_analise
-            )
-
+        with open(arquivo_modo, "w", encoding="utf-8") as f:
+            f.write(modo_analise)
     except:
         pass
-
-    print(
-        f"🧠 Modo análise atual: {modo_analise}"
-    )
 
     # ==========================================
     # RESET POR HORA (RESULTADOS)
     # ==========================================
 
     try:
-
         if os.path.exists(caminho_sequencias):
 
             with open(caminho_sequencias, 'r', encoding='utf-8') as f:
@@ -800,7 +721,6 @@ def calcular_previsao_exata_por_cor(
 
                     print("⏰ Virada de hora detectada")
 
-                    # reset resultados
                     with open(caminho_resultados, "w", newline="", encoding="utf-8") as f:
                         writer = csv.writer(f)
                         writer.writerow(["Resultado"])
@@ -814,7 +734,7 @@ def calcular_previsao_exata_por_cor(
         print(f"❌ Erro reset hora: {e}")
 
     # ==========================================
-    # BUSCA SEQUÊNCIA (JANELAS 5)
+    # BUSCA SEQUÊNCIA
     # ==========================================
 
     janelas_prioridade = [6, 5, 4]
@@ -838,13 +758,26 @@ def calcular_previsao_exata_por_cor(
 
                 previsao_original = saida.upper()
 
+                # ==========================================
+                # 🔥 FAVOR / CONTRA (COR FINAL AQUI)
+                # ==========================================
+
+                if modo_analise == "CONTRA":
+                    previsao_final = (
+                        "VERMELHO"
+                        if previsao_original == "AZUL"
+                        else "AZUL"
+                    )
+                else:
+                    previsao_final = previsao_original
+
                 print(f"✅ Sequência encontrada: {entrada_upper}")
                 print(f"🔍 Padrão original: {previsao_original}")
                 print(f"📈 Modo análise: {modo_analise}")
-                print(f"🎯 PREVISÃO COR: {previsao_original}")
+                print(f"🎯 PREVISÃO FINAL: {previsao_final}")
 
                 return {
-                    "cor": previsao_original,
+                    "cor": previsao_final,
                     "entrada": entrada_upper,
                     "original": previsao_original,
                     "modo": modo_analise

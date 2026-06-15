@@ -321,68 +321,65 @@ async def enviar_previsao(
     horario = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # =====================================================
-    # CARREGA MODO (FAVOR / CONTRA)
+    # REGRA PRINCIPAL:
+    # CÓDIGO TEM PRIORIDADE SOBRE ACESSÓRIO
     # =====================================================
-    modo_analise = "FAVOR"
+    usar_acessorio = True
 
-    try:
-        with open("modo_analise.txt", "r", encoding="utf-8") as f:
-            modo_analise = f.read().strip().upper()
-    except:
-        pass
+    if (
+        codigo_previsto
+        and confianca is not None
+        and confianca >= 0.85
+    ):
+        usar_acessorio = False
 
     # =====================================================
     # NORMALIZA COR
     # =====================================================
-    if isinstance(cor_prevista, dict):
-        cor_base = cor_prevista.get("cor", "AZUL")
-    else:
-        cor_base = str(cor_prevista)
-
-    cor_base = cor_base.strip().upper()
-
-    # =====================================================
-    # APLICA MODO (FAVOR / CONTRA)
-    # =====================================================
-    if modo_analise == "CONTRA":
-        cor_base = "VERMELHO" if cor_base == "AZUL" else "AZUL"
-
-    # =====================================================
-    # REGRA DO ACESSÓRIO (SÓ ENTRA COM ALTA CONFIANÇA)
-    # =====================================================
-    usar_acessorio = False
-
-    if (
-        acessorio
-        and confianca is not None
-        and float(confianca) >= 0.85
-    ):
-        usar_acessorio = True
+    cor_base = (
+        cor_prevista["cor"]
+        if isinstance(cor_prevista, dict)
+        else cor_prevista
+    )
 
     # =====================================================
     # IMAGEM
     # =====================================================
     img_url = None
 
-    if usar_acessorio:
+    if usar_acessorio and acessorio:
 
         try:
 
-            acessorio = str(acessorio).upper()
+            acessorio = acessorio.upper()
 
-            if cor_base == "AZUL" and acessorio in CODIGOS_AZUL:
-                codigo_img = CODIGOS_AZUL[acessorio][0]
-                img_url = f"https://www.pa3333.com/static/game/{codigo_img}.png"
+            if cor_base.upper() == "AZUL":
 
-            elif cor_base == "VERMELHO" and acessorio in CODIGOS_VERMELHO:
-                codigo_img = CODIGOS_VERMELHO[acessorio][0]
-                img_url = f"https://www.pa3333.com/static/game/{codigo_img}.png"
+                if acessorio in CODIGOS_AZUL:
+
+                    codigo_img = CODIGOS_AZUL[acessorio][0]
+
+                    img_url = (
+                        f"https://www.pa3333.com/static/game/"
+                        f"{codigo_img}.png"
+                    )
+
+            elif cor_base.upper() == "VERMELHO":
+
+                if acessorio in CODIGOS_VERMELHO:
+
+                    codigo_img = CODIGOS_VERMELHO[acessorio][0]
+
+                    img_url = (
+                        f"https://www.pa3333.com/static/game/"
+                        f"{codigo_img}.png"
+                    )
 
         except Exception as erro:
             print(f"⚠️ Erro imagem acessório: {erro}")
 
     # =====================================================
-    # FALLBACK IMAGEM COR
+    # FALLBACK PARA IMAGEM NORMAL DA COR
     # =====================================================
     if not img_url:
         img_url = escolher_imagem_exata(cor_base)
@@ -391,7 +388,6 @@ async def enviar_previsao(
     # DEBUG
     # =====================================================
     print(f"DEBUG cor = {cor_base}")
-    print(f"DEBUG modo = {modo_analise}")
     print(f"DEBUG codigo_previsto = {codigo_previsto}")
     print(f"DEBUG confianca = {confianca}")
     print(f"DEBUG acessorio = {acessorio}")
@@ -399,16 +395,15 @@ async def enviar_previsao(
     print(f"DEBUG img_url = {img_url}")
 
     # =====================================================
-    # MENSAGEM
+    # MENSAGEM BASE
     # =====================================================
     linha_previsao = f"🎯 Próxima previsão: {cor_base}"
 
-    if usar_acessorio:
+    if usar_acessorio and acessorio:
         linha_previsao += f" | ACESSÓRIO: {acessorio}"
 
     mensagem = (
         f"⏰ {horario}\n"
-        f"📊 Modo: {modo_analise}\n"
         f"{linha_previsao}"
     )
 
@@ -422,10 +417,7 @@ async def enviar_previsao(
     # CONFIANÇA
     # =====================================================
     if confianca is not None:
-        try:
-            mensagem += f"\n📊 Confiança: {float(confianca):.1%}"
-        except:
-            mensagem += f"\n📊 Confiança: {confianca}"
+        mensagem += f"\n📊 Confiança: {confianca:.1%}"
 
     # =====================================================
     # ENVIO
@@ -433,12 +425,15 @@ async def enviar_previsao(
     try:
 
         if img_url:
+
             await bot.send_photo(
                 chat_id=CHAT_ID,
                 photo=img_url,
                 caption=mensagem
             )
+
         else:
+
             await bot.send_message(
                 chat_id=CHAT_ID,
                 text=mensagem
@@ -742,6 +737,7 @@ async def loop_previsoes():
 
             agora = datetime.now()
 
+            # ================= RESET TENDÊNCIA =================
             resetar_tendencia_se_necessario()
 
             # ================= RESET BOT =================
@@ -749,11 +745,13 @@ async def loop_previsoes():
                 ultima_hora_reset = agora.hour
                 await resetar_bot()
 
-            # ================= RELATÓRIO =================
+            # ================= RELATÓRIO POR HORA =================
             if "ultima_hora_relatorio" not in globals():
                 ultima_hora_relatorio = agora.hour
 
             if agora.hour != ultima_hora_relatorio:
+
+                print(f"📊 Enviando relatório da hora {ultima_hora_relatorio:02d}...")
 
                 if resultados:
                     await enviar_relatorio()
@@ -761,10 +759,16 @@ async def loop_previsoes():
 
                 ultima_hora_relatorio = agora.hour
 
-            # ================= CAPTURA =================
-            if agora.second >= 57:
+            # =====================================================
+            # COLETA FINAL DAS APOSTAS
+            # =====================================================
+            segundos = agora.second
+
+            if segundos >= 57:
+                print("📊 Coletando apostas finais do minuto...")
                 pegar_valores_apostas()
 
+            # ================= RESULTADO =================
             resultado = pegar_ultima_cor()
 
             if not resultado:
@@ -779,35 +783,61 @@ async def loop_previsoes():
 
             salvar_historico(cor_atual, codigo_atual)
 
+            # ================= HISTÓRICO =================
             historico_tendencia.append(
-                (agora.strftime("%Y-%m-%d %H:%M:%S"), cor_atual, codigo_atual)
+                (
+                    agora.strftime("%Y-%m-%d %H:%M:%S"),
+                    cor_atual,
+                    codigo_atual
+                )
             )
 
             historico_tendencia = historico_tendencia[-60:]
 
             historico = carregar_historico_completo()
 
-            # ================= VALIDAÇÃO =================
+            # ================= VALIDAR RESULTADO =================
             if ultima_previsao:
 
-                # 🔥 GARANTE FORMATO CORRETO
-                if isinstance(ultima_previsao, tuple):
-                    cor_esperada = ultima_previsao[0]
-                elif isinstance(ultima_previsao, dict):
-                    cor_esperada = ultima_previsao.get("cor")
-                else:
-                    cor_esperada = ultima_previsao
+                hora_ref = (agora - timedelta(minutes=1)).strftime("%H:%M")
+
+                cor_esperada = ultima_previsao.get("cor")
 
                 acertou = (cor_atual == cor_esperada)
 
                 await enviar_resultado(acertou)
 
-                resultados.append((cor_esperada, agora.strftime("%H:%M"), acertou))
+                resultados.append(
+                    (cor_esperada, hora_ref, acertou)
+                )
 
+                # ================= VALIDAÇÃO ACESSÓRIO =================
                 try:
                     processar_validacao_acessorio()
                 except Exception as e:
                     print(f"⚠️ Erro validação acessório: {e}")
+
+                # ================= SALVAR CSV =================
+                try:
+
+                    arquivo_resultados = "resultados.csv"
+
+                    if not os.path.exists(arquivo_resultados):
+                        with open(arquivo_resultados, "w", newline="", encoding="utf-8") as f:
+                            writer = csv.writer(f)
+                            writer.writerow(["Timestamp", "Cor", "Horario", "Resultado"])
+
+                    with open(arquivo_resultados, "a", newline="", encoding="utf-8") as f:
+                        writer = csv.writer(f)
+                        writer.writerow([
+                            agora.strftime("%Y-%m-%d %H:%M:%S"),
+                            cor_esperada,
+                            hora_ref,
+                            "WIN" if acertou else "LOSS"
+                        ])
+
+                except Exception as e:
+                    print(f"⚠️ Erro salvando resultado: {e}")
 
                 ultima_previsao = None
 
@@ -816,45 +846,53 @@ async def loop_previsoes():
             previsao_codigo = None
             confianca = None
 
+            # =====================================================
             # 1 - PRESSÃO
+            # =====================================================
             resultado_pressao = calcular_pressao_apostas()
 
             if resultado_pressao:
+
                 cor_pressao = resultado_pressao.get("cor")
-                forca = resultado_pressao.get("forca")
+                forca_pressao = resultado_pressao.get("forca")
 
                 if cor_pressao in ["AZUL", "VERMELHO"]:
-                    previsao_cor = cor_pressao
-                    confianca = min(forca / 1000, 0.99)
 
+                    previsao_cor = cor_pressao
+                    confianca = min(forca_pressao / 1000, 0.99)
+
+            # =====================================================
             # 2 - CÓDIGO
+            # =====================================================
             resultado_codigo = calcular_previsao_exata(historico)
 
             if resultado_codigo:
 
                 codigo_prev, cor_prev, confianca_prev = resultado_codigo
 
-                if not previsao_cor:
-                    previsao_cor = cor_prev
-                    previsao_codigo = codigo_prev
-                    confianca = confianca_prev
-                else:
+                if previsao_cor:
+
                     if cor_prev == previsao_cor:
                         previsao_codigo = codigo_prev
                         confianca = max(confianca or 0, confianca_prev)
 
-            # 3 - COR EXTRA
+                else:
+
+                    previsao_cor = cor_prev
+                    previsao_codigo = codigo_prev
+                    confianca = confianca_prev
+
+            # =====================================================
+            # 3 - COR
+            # =====================================================
             resultado_cor = calcular_previsao_exata_por_cor(historico)
 
             if resultado_cor and not previsao_cor:
+                previsao_cor = resultado_cor.get("cor")
 
-                # 🔥 GARANTE FORMATO SEM QUEBRAR MAIN
-                if isinstance(resultado_cor, dict):
-                    previsao_cor = resultado_cor.get("cor")
-                else:
-                    previsao_cor = resultado_cor
-
-            # ================= ENVIO =================
+            # =====================================================
+            # ENVIO FINAL
+            # =====================================================
             if previsao_cor:
 
                 acessorio_previsto = None
@@ -863,22 +901,37 @@ async def loop_previsoes():
 
                     usar_acessorio = True
 
-                    # 🔥 regra consistente (única fonte)
-                    if previsao_codigo and confianca is not None and confianca >= 0.74:
+                    if (
+                        previsao_codigo
+                        and confianca is not None
+                        and confianca >= 0.74
+                    ):
                         usar_acessorio = False
-                        print(f"🔑 Código forte detectado ({confianca:.1%}) - acessório bloqueado")
+
+                        print(
+                            f"🔑 Código forte detectado ({confianca:.1%}) - acessório bloqueado"
+                        )
 
                     if usar_acessorio:
+
                         resultado_acessorio = prever_proximo_acessorio()
+
+                        print(f"DEBUG ACESSÓRIO: {resultado_acessorio}")
 
                         if resultado_acessorio:
                             acessorio_previsto = resultado_acessorio.get("acessorio")
 
+                            if acessorio_previsto == "DESCONHECIDO":
+                                acessorio_previsto = None
+
                 except Exception as e:
                     print(f"⚠️ Erro previsão acessório: {e}")
 
-                # 🔥 SEM AMBIGUIDADE
-                ultima_previsao = previsao_cor
+                # 🔥 IMPORTANTE: agora tudo é dict consistente
+                ultima_previsao = {
+                    "cor": previsao_cor,
+                    "codigo": previsao_codigo
+                }
 
                 await enviar_previsao(
                     previsao_cor,
@@ -888,7 +941,10 @@ async def loop_previsoes():
                 )
 
             # ================= ESPERA =================
-            proximo = (agora + timedelta(minutes=1)).replace(second=15, microsecond=0)
+            proximo = (agora + timedelta(minutes=1)).replace(
+                second=15,
+                microsecond=0
+            )
 
             tempo = (proximo - agora).total_seconds()
 
