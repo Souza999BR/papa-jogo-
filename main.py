@@ -742,7 +742,6 @@ async def loop_previsoes():
 
             agora = datetime.now()
 
-            # ================= RESET TENDÊNCIA =================
             resetar_tendencia_se_necessario()
 
             # ================= RESET BOT =================
@@ -762,7 +761,10 @@ async def loop_previsoes():
 
                 ultima_hora_relatorio = agora.hour
 
-            # ================= RESULTADO =================
+            # ================= CAPTURA =================
+            if agora.second >= 57:
+                pegar_valores_apostas()
+
             resultado = pegar_ultima_cor()
 
             if not resultado:
@@ -788,10 +790,13 @@ async def loop_previsoes():
             # ================= VALIDAÇÃO =================
             if ultima_previsao:
 
-                cor_esperada = ultima_previsao[0]
-
-                if isinstance(cor_esperada, dict):
-                    cor_esperada = cor_esperada.get("cor", "DESCONHECIDO")
+                # 🔥 GARANTE FORMATO CORRETO
+                if isinstance(ultima_previsao, tuple):
+                    cor_esperada = ultima_previsao[0]
+                elif isinstance(ultima_previsao, dict):
+                    cor_esperada = ultima_previsao.get("cor")
+                else:
+                    cor_esperada = ultima_previsao
 
                 acertou = (cor_atual == cor_esperada)
 
@@ -806,7 +811,7 @@ async def loop_previsoes():
 
                 ultima_previsao = None
 
-            # ================= PREVISÃO BASE =================
+            # ================= PREVISÃO =================
             previsao_cor = None
             previsao_codigo = None
             confianca = None
@@ -822,50 +827,58 @@ async def loop_previsoes():
                     previsao_cor = cor_pressao
                     confianca = min(forca / 1000, 0.99)
 
-            # 2 - CÓDIGO (PRIORIDADE MAIS FORTE)
+            # 2 - CÓDIGO
             resultado_codigo = calcular_previsao_exata(historico)
 
             if resultado_codigo:
+
                 codigo_prev, cor_prev, confianca_prev = resultado_codigo
 
                 if not previsao_cor:
                     previsao_cor = cor_prev
+                    previsao_codigo = codigo_prev
+                    confianca = confianca_prev
+                else:
+                    if cor_prev == previsao_cor:
+                        previsao_codigo = codigo_prev
+                        confianca = max(confianca or 0, confianca_prev)
 
-                previsao_codigo = codigo_prev
-                confianca = confianca_prev
-
-            # 3 - COR FINAL
+            # 3 - COR EXTRA
             resultado_cor = calcular_previsao_exata_por_cor(historico)
 
             if resultado_cor and not previsao_cor:
-                previsao_cor = resultado_cor
 
-            # ================= ACESSÓRIO (SEPARADO DO CÓDIGO) =================
-            acessorio_previsto = None
+                # 🔥 GARANTE FORMATO SEM QUEBRAR MAIN
+                if isinstance(resultado_cor, dict):
+                    previsao_cor = resultado_cor.get("cor")
+                else:
+                    previsao_cor = resultado_cor
 
+            # ================= ENVIO =================
             if previsao_cor:
+
+                acessorio_previsto = None
 
                 try:
 
-                    resultado_acessorio = prever_proximo_acessorio()
+                    usar_acessorio = True
 
-                    if resultado_acessorio:
+                    # 🔥 regra consistente (única fonte)
+                    if previsao_codigo and confianca is not None and confianca >= 0.74:
+                        usar_acessorio = False
+                        print(f"🔑 Código forte detectado ({confianca:.1%}) - acessório bloqueado")
 
-                        conf_acc = resultado_acessorio.get("confianca", 0)
+                    if usar_acessorio:
+                        resultado_acessorio = prever_proximo_acessorio()
 
-                        if conf_acc >= 85:   # 🔥 REGRA ÚNICA E LIMPA
+                        if resultado_acessorio:
                             acessorio_previsto = resultado_acessorio.get("acessorio")
 
-                        else:
-                            print(f"⚠️ Acessório ignorado ({conf_acc:.2f}%)")
-
                 except Exception as e:
-                    print(f"⚠️ Erro acessório: {e}")
+                    print(f"⚠️ Erro previsão acessório: {e}")
 
-            # ================= SALVA PREVISÃO =================
-            if previsao_cor:
-
-                ultima_previsao = (previsao_cor, previsao_codigo)
+                # 🔥 SEM AMBIGUIDADE
+                ultima_previsao = previsao_cor
 
                 await enviar_previsao(
                     previsao_cor,
@@ -875,10 +888,7 @@ async def loop_previsoes():
                 )
 
             # ================= ESPERA =================
-            proximo = (agora + timedelta(minutes=1)).replace(
-                second=15,
-                microsecond=0
-            )
+            proximo = (agora + timedelta(minutes=1)).replace(second=15, microsecond=0)
 
             tempo = (proximo - agora).total_seconds()
 
