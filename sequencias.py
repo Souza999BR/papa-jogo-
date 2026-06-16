@@ -623,11 +623,12 @@ def calcular_previsao_exata_por_cor(
         print(f"❌ Erro resultados: {e}")
 
     # ==========================================
-    # CONTROLE DE MODO POR HORA
+    # CONTROLE DE MODO
     # ==========================================
 
     arquivo_modo = "modo_analise.txt"
     arquivo_hora_modo = "ultima_hora_modo.txt"
+    arquivo_decisao = "modo_proxima_hora.txt"
 
     modo_anterior = "FAVOR"
 
@@ -635,45 +636,75 @@ def calcular_previsao_exata_por_cor(
         if os.path.exists(arquivo_modo):
             with open(arquivo_modo, "r", encoding="utf-8") as f:
                 valor_salvo = f.read().strip().upper()
-
                 if valor_salvo in ["CONTRA", "FAVOR"]:
                     modo_anterior = valor_salvo
-
-    except Exception as erro:
-        print(f"⚠️ Erro ao carregar modo: {erro}")
+    except:
+        pass
 
     modo_analise = modo_anterior
 
-    print(f"🧠 Modo análise atual: {modo_analise}")
-
     # ==========================================
-    # TROCA APENAS UMA VEZ POR HORA
+    # TEMPO ATUAL
     # ==========================================
 
-    hora_atual_modo = datetime.now().strftime("%Y-%m-%d %H")
+    agora = datetime.now()
+    hora_atual_modo = agora.strftime("%Y-%m-%d %H")
+    minuto_atual = agora.minute
+
+    # ==========================================
+    # DECISÃO NO MINUTO 58 (ANTI RESET BUG)
+    # ==========================================
+
+    if minuto_atual == 58:
+
+        novo_modo = modo_anterior
+
+        if total_loss > total_win:
+
+            if modo_anterior == "FAVOR":
+                novo_modo = "CONTRA"
+                print("🔄 LOSS > WIN → FAVOR para CONTRA")
+            else:
+                novo_modo = "FAVOR"
+                print("🔄 LOSS > WIN → CONTRA para FAVOR")
+
+        else:
+            print("✅ WIN >= LOSS → Mantendo modo atual")
+
+        try:
+            with open(arquivo_decisao, "w", encoding="utf-8") as f:
+                f.write(novo_modo)
+
+            print(f"💾 Modo da próxima hora salvo: {novo_modo}")
+
+        except:
+            pass
+
+    # ==========================================
+    # APLICAR MODO SALVO (UMA VEZ POR HORA)
+    # ==========================================
+
     ultima_hora_processada = ""
 
     try:
         if os.path.exists(arquivo_hora_modo):
             with open(arquivo_hora_modo, "r", encoding="utf-8") as f:
                 ultima_hora_processada = f.read().strip()
-
-    except Exception as erro:
-        print(f"⚠️ Erro lendo hora modo: {erro}")
+    except:
+        pass
 
     if hora_atual_modo != ultima_hora_processada:
 
-        if total_loss > total_win:
+        try:
+            if os.path.exists(arquivo_decisao):
+                with open(arquivo_decisao, "r", encoding="utf-8") as f:
+                    modo_salvo = f.read().strip().upper()
 
-            if modo_anterior == "FAVOR":
-                modo_analise = "CONTRA"
-                print("🔄 LOSS > WIN → FAVOR para CONTRA")
-            else:
-                modo_analise = "FAVOR"
-                print("🔄 LOSS > WIN → CONTRA para FAVOR")
-
-        else:
-            print("✅ WIN >= LOSS → Mantendo modo atual")
+                    if modo_salvo in ["FAVOR", "CONTRA"]:
+                        modo_analise = modo_salvo
+                        print(f"🧠 Aplicando modo da próxima hora: {modo_analise}")
+        except:
+            pass
 
         try:
             with open(arquivo_hora_modo, "w", encoding="utf-8") as f:
@@ -681,15 +712,17 @@ def calcular_previsao_exata_por_cor(
         except:
             pass
 
-    # salvar modo
+    # salvar modo atual
     try:
         with open(arquivo_modo, "w", encoding="utf-8") as f:
             f.write(modo_analise)
     except:
         pass
 
+    print(f"🧠 Modo análise atual: {modo_analise}")
+
     # ==========================================
-    # RESET POR HORA (RESULTADOS)
+    # RESET POR HORA (MAIN NÃO INTERFERE MAIS AQUI)
     # ==========================================
 
     try:
@@ -737,21 +770,17 @@ def calcular_previsao_exata_por_cor(
     # BUSCA SEQUÊNCIA
     # ==========================================
 
-    janelas_prioridade = [6, 5, 4]
-
-    for janela_desejada in janelas_prioridade:
+    for janela_desejada in [6, 5, 4]:
 
         for entrada, saida in sequencias_fixas:
 
-            janela = len(entrada)
-
-            if janela != janela_desejada:
+            if len(entrada) != janela_desejada:
                 continue
 
-            if len(historico_cores) < janela:
+            if len(historico_cores) < janela_desejada:
                 continue
 
-            ultimos = [x[1].upper() for x in historico_cores[-janela:]]
+            ultimos = [x[1].upper() for x in historico_cores[-janela_desejada:]]
             entrada_upper = [x.upper() for x in entrada]
 
             if ultimos == entrada_upper:
@@ -759,7 +788,7 @@ def calcular_previsao_exata_por_cor(
                 previsao_original = saida.upper()
 
                 # ==========================================
-                # 🔥 FAVOR / CONTRA (COR FINAL AQUI)
+                # APLICA FAVOR / CONTRA
                 # ==========================================
 
                 if modo_analise == "CONTRA":
@@ -785,7 +814,6 @@ def calcular_previsao_exata_por_cor(
 
     print("⚠️ Nenhuma sequência encontrada.")
     return None
-
 
 # ========================
 # PREVISÃO POR CÓDIGO
