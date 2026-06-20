@@ -136,7 +136,7 @@ def gerar_padroes(
         freq
     ) in melhores.items():
 
-        if freq ==2:
+        if freq <=3:
             continue
 
         padroes_filtrados.append(
