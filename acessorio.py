@@ -223,7 +223,7 @@ def prever_proximo_acessorio():
 
             peso = PESOS_DINAMICOS[(cor_nome, pred)]
 
-            if taxa >= 0.60:
+            if taxa > 0.75:
                 predicoes_janelas.append(pred)
                 votos.extend([pred] * int(taxa * pesos_base[janela] * peso * 10))
 
@@ -237,7 +237,7 @@ def prever_proximo_acessorio():
         acessorio = final.most_common(1)[0][0]
         confianca = (final[acessorio] / sum(final.values())) * 100
 
-        if confianca >= 70:
+        if confianca > 75:
             resultados[cor_nome] = (acessorio, confianca)
 
     if not resultados:
@@ -294,7 +294,7 @@ def processar_validacao_acessorio():
     if acessorio_real == "DESCONHECIDO" or not ultima_previsao_acessorio:
         return
 
-    if ultima_confianca_acessorio < 85:
+    if ultima_confianca_acessorio > 75:
         return
 
     if acessorio_real == ultima_previsao_acessorio:
