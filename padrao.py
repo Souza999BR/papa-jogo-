@@ -41,7 +41,7 @@ def filtrar_sequencias_consecutivas(historico):
             # quebra a sequência — começa nova
             consecutivos = [historico[i]]
 
-    return consecutivos if len(consecutivos) >= 6 else []
+    return consecutivos if len(consecutivos) > 6 else []
 
 
 
@@ -136,7 +136,7 @@ def gerar_padroes(
         freq
     ) in melhores.items():
 
-        if freq <3:
+        if freq <2:
             continue
 
         padroes_filtrados.append(
