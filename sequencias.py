@@ -770,7 +770,7 @@ def calcular_previsao_exata_por_cor(
     # BUSCA SEQUÊNCIA
     # ==========================================
 
-    for janela_desejada in [6, 5, 4]:
+    for janela_desejada in [5]:
 
         for entrada, saida in sequencias_fixas:
 
