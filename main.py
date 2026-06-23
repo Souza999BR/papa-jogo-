@@ -53,7 +53,7 @@ from sequencias import (
 )
 
 # ================= CONFIGURAÇÕES =================
-BOT_TOKEN = "5965310119:AAFbNw-r1UgaqMkDn0Ivx4-j-HBPgCKQgFU"
+BOT_TOKEN = "8792510244:AAFWxxM3vrX659FvQG523S-yYmFNzoiFFaU"
 
 CHAT_ID = "-1003937478657"
 
