@@ -152,7 +152,7 @@ def gerar_padroes(
                 if s != saida:
                     erros += f
 
-        if erros >= 2:
+        if erros == 2:
             continue
 
         padroes_filtrados.append(
