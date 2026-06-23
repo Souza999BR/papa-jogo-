@@ -986,13 +986,19 @@ async def main():
 
     await app.initialize()
 
+    # =====================================
+    # REMOVE WEBHOOK CASO EXISTA
+    # =====================================
+    await app.bot.delete_webhook(
+        drop_pending_updates=True
+    )
+
     await app.start()
 
     await app.updater.start_polling()
 
     while True:
         await asyncio.sleep(3600)
-
 
 # =========================================================
 # START
