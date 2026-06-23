@@ -623,103 +623,20 @@ def calcular_previsao_exata_por_cor(
         print(f"❌ Erro resultados: {e}")
 
     # ==========================================
-    # CONTROLE DE MODO
+    # CONTROLE DE MODO (FIXO FAVOR)
     # ==========================================
+
+    modo_analise = "FAVOR"
 
     arquivo_modo = "modo_analise.txt"
-    arquivo_hora_modo = "ultima_hora_modo.txt"
-    arquivo_decisao = "modo_proxima_hora.txt"
 
-    modo_anterior = "FAVOR"
-
-    try:
-        if os.path.exists(arquivo_modo):
-            with open(arquivo_modo, "r", encoding="utf-8") as f:
-                valor_salvo = f.read().strip().upper()
-                if valor_salvo in ["CONTRA", "FAVOR"]:
-                    modo_anterior = valor_salvo
-    except:
-        pass
-
-    modo_analise = modo_anterior
-
-    # ==========================================
-    # TEMPO ATUAL
-    # ==========================================
-
-    agora = datetime.now()
-    hora_atual_modo = agora.strftime("%Y-%m-%d %H")
-    minuto_atual = agora.minute
-
-    # ==========================================
-    # DECISÃO NO MINUTO 58 (ANTI RESET BUG)
-    # ==========================================
-
-    if minuto_atual == 58:
-
-        novo_modo = modo_anterior
-
-        if total_loss > total_win:
-
-            if modo_anterior == "FAVOR":
-                novo_modo = "CONTRA"
-                print("🔄 LOSS > WIN → FAVOR para CONTRA")
-            else:
-                novo_modo = "FAVOR"
-                print("🔄 LOSS > WIN → CONTRA para FAVOR")
-
-        else:
-            print("✅ WIN >= LOSS → Mantendo modo atual")
-
-        try:
-            with open(arquivo_decisao, "w", encoding="utf-8") as f:
-                f.write(novo_modo)
-
-            print(f"💾 Modo da próxima hora salvo: {novo_modo}")
-
-        except:
-            pass
-
-    # ==========================================
-    # APLICAR MODO SALVO (UMA VEZ POR HORA)
-    # ==========================================
-
-    ultima_hora_processada = ""
-
-    try:
-        if os.path.exists(arquivo_hora_modo):
-            with open(arquivo_hora_modo, "r", encoding="utf-8") as f:
-                ultima_hora_processada = f.read().strip()
-    except:
-        pass
-
-    if hora_atual_modo != ultima_hora_processada:
-
-        try:
-            if os.path.exists(arquivo_decisao):
-                with open(arquivo_decisao, "r", encoding="utf-8") as f:
-                    modo_salvo = f.read().strip().upper()
-
-                    if modo_salvo in ["FAVOR", "CONTRA"]:
-                        modo_analise = modo_salvo
-                        print(f"🧠 Aplicando modo da próxima hora: {modo_analise}")
-        except:
-            pass
-
-        try:
-            with open(arquivo_hora_modo, "w", encoding="utf-8") as f:
-                f.write(hora_atual_modo)
-        except:
-            pass
-
-    # salvar modo atual
     try:
         with open(arquivo_modo, "w", encoding="utf-8") as f:
             f.write(modo_analise)
     except:
         pass
 
-    print(f"🧠 Modo análise atual: {modo_analise}")
+    print(f"🧠 Modo análise atual (FIXO): {modo_analise}")
 
     # ==========================================
     # RESET POR HORA (MAIN NÃO INTERFERE MAIS AQUI)
@@ -788,17 +705,10 @@ def calcular_previsao_exata_por_cor(
                 previsao_original = saida.upper()
 
                 # ==========================================
-                # APLICA FAVOR / CONTRA
+                # MODO FIXO FAVOR (SEM CONTRA)
                 # ==========================================
 
-                if modo_analise == "CONTRA":
-                    previsao_final = (
-                        "VERMELHO"
-                        if previsao_original == "AZUL"
-                        else "AZUL"
-                    )
-                else:
-                    previsao_final = previsao_original
+                previsao_final = previsao_original
 
                 print(f"✅ Sequência encontrada: {entrada_upper}")
                 print(f"🔍 Padrão original: {previsao_original}")
