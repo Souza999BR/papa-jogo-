@@ -56,7 +56,7 @@ def gerar_padroes(
     Mantém apenas a ocorrência mais recente.
     Prioriza frequência.
     Remove padrões fracos.
-    Remove conflitos de saída.
+    Remove padrões que erram o resultado 2 vezes.
     """
 
     padroes = Counter()
@@ -136,7 +136,23 @@ def gerar_padroes(
         freq
     ) in melhores.items():
 
-        if freq <2:
+        if freq < 2:
+            continue
+
+        # =====================================
+        # NOVA REGRA: REMOVE SE ERRO >= 2
+        # =====================================
+
+        erros = 0
+
+        for (e, s), f in padroes.items():
+
+            if e == entrada:
+
+                if s != saida:
+                    erros += f
+
+        if erros >= 2:
             continue
 
         padroes_filtrados.append(
