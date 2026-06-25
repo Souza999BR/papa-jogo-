@@ -15,11 +15,16 @@ ultimo_codigo_processado = None
 ultimo_reset_hora = None
 
 # =========================================================
-# CACHE + PESOS DINÂMICOS
+# CACHE + PESOS DINÂMICOS (LEARNING ENGINE)
 # =========================================================
 
 CACHE_PADROES = {}
+
+# peso base por (cor, acessório)
 PESOS_DINAMICOS = defaultdict(lambda: 1.0)
+
+# memória de performance por padrão
+HISTORICO_APRENDIZADO = defaultdict(lambda: {"win": 0, "loss": 0})
 
 
 # =========================================================
@@ -78,6 +83,33 @@ CODIGOS_VERMELHO = {
     ]
 }
 
+
+TODOS_ACESSORIOS = set(CODIGOS_AZUL.keys()) | set(CODIGOS_VERMELHO.keys())
+
+
+# =========================================================
+# LEARNING ENGINE (NOVO CORE)
+# =========================================================
+
+def atualizar_pesos(acessorio, cor, resultado):
+    """
+    resultado: "win" ou "loss"
+    """
+
+    key = (cor, acessorio)
+
+    if resultado == "win":
+        PESOS_DINAMICOS[key] += 0.05  # crescimento lento
+        HISTORICO_APRENDIZADO[key]["win"] += 1
+
+    else:
+        PESOS_DINAMICOS[key] -= 0.03  # queda lenta
+        HISTORICO_APRENDIZADO[key]["loss"] += 1
+
+    # limites suaves (evita colapso)
+    PESOS_DINAMICOS[key] = max(0.3, min(2.5, PESOS_DINAMICOS[key]))
+
+
 # =========================================================
 # RESET
 # =========================================================
@@ -92,7 +124,6 @@ def resetar_por_hora(caminho_resultados):
         return
 
     ultimo_reset_hora = agora
-
     acessorio_wins = 0
     acessorio_loss = 0
     ultima_previsao_acessorio = None
@@ -152,7 +183,7 @@ def carregar_historico(csv_file="sequencias.csv"):
 
 
 # =========================================================
-# PADRÕES
+# CACHE PADRÕES
 # =========================================================
 
 def gerar_padroes_cache(hist, janela):
@@ -225,7 +256,7 @@ def prever_proximo_acessorio():
 
             if taxa > 0.75:
                 predicoes_janelas.append(pred)
-                votos.extend([pred] * int(taxa * pesos_base[janela] * peso * 10))
+                votos.append(pred)
 
         if len(predicoes_janelas) < 2:
             continue
@@ -246,30 +277,24 @@ def prever_proximo_acessorio():
 
     cor, (acessorio, confianca) = max(resultados.items(), key=lambda x: x[1][1])
 
-    # =====================================================
-    # 🔥 GARANTE CONSISTÊNCIA FINAL
-    # =====================================================
-    cor_final = cor  # mantém lógica atual (AZUL / VERMELHO)
-
-    # valida segurança: acessório deve existir na cor escolhida
-    if acessorio not in (CODIGOS_AZUL.keys() | CODIGOS_VERMELHO.keys()):
-        print("⚠️ Acessório inválido para mapa")
+    if acessorio not in TODOS_ACESSORIOS:
+        print("⚠️ Acessório inválido")
         return None
 
     ultima_previsao_acessorio = acessorio
     ultima_confianca_acessorio = confianca
 
-    print(f"🎯 PREVISÃO ACESSÓRIO: {cor_final} | {acessorio} | {confianca:.2f}%")
+    print(f"🎯 PREVISÃO: {cor} | {acessorio} | {confianca:.2f}%")
 
     return {
-        "cor": cor_final,
+        "cor": cor,
         "acessorio": acessorio,
         "confianca": round(confianca, 2)
     }
 
 
 # =========================================================
-# VALIDAÇÃO (SEM BUG DE cor_nome)
+# VALIDAÇÃO (CORE DO APRENDIZADO)
 # =========================================================
 
 def processar_validacao_acessorio():
@@ -294,13 +319,13 @@ def processar_validacao_acessorio():
     if acessorio_real == "DESCONHECIDO" or not ultima_previsao_acessorio:
         return
 
-    if ultima_confianca_acessorio > 75:
-        return
-
+    # aprendizado contínuo
     if acessorio_real == ultima_previsao_acessorio:
         acessorio_wins += 1
+        atualizar_pesos(acessorio_real, "GLOBAL", "win")
     else:
         acessorio_loss += 1
+        atualizar_pesos(ultima_previsao_acessorio, "GLOBAL", "loss")
 
 
 # =========================================================
