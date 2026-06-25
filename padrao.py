@@ -32,17 +32,17 @@ def filtrar_sequencias_consecutivas(historico):
         return []
 
     consecutivos = [historico[0]]
+
     for i in range(1, len(historico)):
         t1 = datetime.strptime(historico[i - 1][0], "%Y-%m-%d %H:%M:%S")
         t2 = datetime.strptime(historico[i][0], "%Y-%m-%d %H:%M:%S")
+
         if t2 - t1 == timedelta(minutes=1):
             consecutivos.append(historico[i])
         else:
-            # quebra a sequência — começa nova
             consecutivos = [historico[i]]
 
     return consecutivos if len(consecutivos) > 10 else []
-
 
 
 def gerar_padroes(
@@ -56,7 +56,7 @@ def gerar_padroes(
     Mantém apenas a ocorrência mais recente.
     Prioriza frequência.
     Remove padrões fracos.
-    Remove padrões que erram o resultado 2 vezes.
+    Remove padrões que erram 2 vezes em previsão real.
     """
 
     padroes = Counter()
@@ -65,30 +65,12 @@ def gerar_padroes(
     # LEVANTAMENTO DE PADRÕES
     # =====================================
 
-    for t in range(
-        tamanho_min,
-        tamanho_max + 1
-    ):
+    for t in range(tamanho_min, tamanho_max + 1):
+        for i in range(len(cores) - t):
+            entrada = tuple(cores[i:i + t])
+            saida = cores[i + t]
 
-        for i in range(
-            len(cores) - t
-        ):
-
-            entrada = tuple(
-                cores[i:i + t]
-            )
-
-            saida = (
-                cores[i + t]
-                if i + t < len(cores)
-                else None
-            )
-
-            if saida:
-
-                padroes[
-                    (entrada, saida)
-                ] += 1
+            padroes[(entrada, saida)] += 1
 
     if not padroes:
         return []
@@ -99,105 +81,77 @@ def gerar_padroes(
 
     padroes_ordenados = sorted(
         padroes.items(),
-        key=lambda x: (
-            x[1],
-            len(x[0][0])
-        ),
+        key=lambda x: (x[1], len(x[0][0])),
         reverse=True
     )
 
     # =====================================
-    # MANTÉM SOMENTE A MELHOR SAÍDA
-    # PARA CADA ENTRADA
+    # MELHOR SAÍDA POR ENTRADA
     # =====================================
 
     melhores = {}
 
-    for (
-        entrada,
-        saida
-    ), freq in padroes_ordenados:
-
+    for (entrada, saida), freq in padroes_ordenados:
         if entrada not in melhores:
-
-            melhores[entrada] = (
-                saida,
-                freq
-            )
+            melhores[entrada] = (saida, freq)
 
     # =====================================
-    # REMOVE PADRÕES FRACOS
+    # FILTRO DE QUALIDADE (NOVO ERRO REAL)
     # =====================================
 
     padroes_filtrados = []
 
-    for entrada, (
-        saida,
-        freq
-    ) in melhores.items():
+    for entrada, (saida, freq) in melhores.items():
 
         if freq < 2:
             continue
 
         # =====================================
-        # NOVA REGRA: REMOVE SE ERRO >= 2
+        # NOVA REGRA: ERRO REAL DE PREVISÃO
         # =====================================
-
         erros = 0
 
-        for (e, s), f in padroes.items():
+        for i in range(len(cores) - len(entrada)):
+            janela = tuple(cores[i:i + len(entrada)])
+            prox = cores[i + len(entrada)]
 
-            if e == entrada:
+            if janela == entrada:
+                if prox != saida:
+                    erros += 1
 
-                if s != saida:
-                    erros += f
-
-        if erros == 2:
+        # remove somente se errou 2 vezes (ocorrências reais)
+        if erros >= 2:
             continue
 
-        padroes_filtrados.append(
-            (
-                (entrada, saida),
-                freq
-            )
-        )
+        padroes_filtrados.append(((entrada, saida), freq))
 
     # =====================================
     # ORDENA NOVAMENTE
     # =====================================
 
     padroes_filtrados.sort(
-        key=lambda x: (
-            x[1],
-            len(x[0][0])
-        ),
+        key=lambda x: (x[1], len(x[0][0])),
         reverse=True
     )
 
     # =====================================
-    # REMOVE DUPLICATAS DE SAÍDA
-    # MANTÉM OS MAIS FORTES
+    # REMOVE DUPLICATAS DE ENTRADA
     # =====================================
 
     resultado_final = []
     entradas_usadas = set()
 
     for item in padroes_filtrados:
-
         entrada = item[0][0]
 
         if entrada in entradas_usadas:
             continue
 
-        entradas_usadas.add(
-            entrada
-        )
-
-        resultado_final.append(
-            item
-        )
+        entradas_usadas.add(entrada)
+        resultado_final.append(item)
 
     return resultado_final[:top]
+
 
 def salvar_padroes(padroes):
     """Salva padrões no arquivo seq.csv"""
@@ -208,7 +162,9 @@ def salvar_padroes(padroes):
                 entrada_fmt = ", ".join(f"\"{c}\"" for c in entrada)
                 f.write(f"    ([{entrada_fmt}], \"{saida}\"),\n")
             f.write("]\n")
+
         print(f"✅ {len(padroes)} padrões salvos em {SEQ_PADRAO_FILE}")
+
     except Exception as e:
         print("Erro ao salvar padrões:", e)
 
@@ -220,7 +176,6 @@ if __name__ == "__main__":
     if len(historico_consecutivo) < 10:
         print("⚠️ Nenhuma sequência consecutiva suficiente encontrada.")
     else:
-        # pega apenas as cores do histórico filtrado
         cores_filtradas = [c for _, c in historico_consecutivo]
         padroes = gerar_padroes(cores_filtradas)
         salvar_padroes(padroes)
