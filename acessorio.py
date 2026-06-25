@@ -20,10 +20,8 @@ ultimo_reset_hora = None
 
 CACHE_PADROES = {}
 
-# peso base por (cor, acessório)
 PESOS_DINAMICOS = defaultdict(lambda: 1.0)
 
-# memória de performance por padrão
 HISTORICO_APRENDIZADO = defaultdict(lambda: {"win": 0, "loss": 0})
 
 
@@ -37,19 +35,16 @@ CODIGOS_AZUL = {
         "1701CF909C49835D0C793C7A7EF82A5D", "620726CCE3CBC8C574E5889CB404DA8C",
         "6B5DFCF1F44C9D485DDA1902AC33C0A9", "A5CB00D7C8FFFE5FB2C79C540A54817A"
     ],
-
     "OCULOS": [
         "FAE594628F003E7D8250252BAA6A83B2", "F2A057FC73359A2781F0FD48F63D6FDE",
         "4864DAFB55D05D74897FDCE5DEE7FD22", "88CB29DAAB6DD7AE3016B506C36E9F17",
         "C22C60349630D688CEF20A3FD708AD87", "C0069D16731C2D1EEFF8F67ED560B89B"
     ],
-
     "CHIFRE": [
         "2F5BB7747EFDA0546636FB385A3FA593", "1981E4A762B39858DC33F9EA28ED065A",
         "17380DDB842E984302034E1BB66C24E4", "2A0270F3B3A57F49C195A7F2B0736564",
         "3C46A0407BE60A1F00731AB8E9575DF2", "80D2B8BBB1D9FBB8AEC70C802CC67BAD"
     ],
-
     "SEM ACESSORIO": [
         "1F289CD1A244A837B3D946160B49E54D", "8FBDBF5573B18FAE93736180F8D0197A",
         "74BDEFAB9757A081606B181AC29F1DB2", "0299C06AED970473AE41D986B308CD09",
@@ -63,19 +58,16 @@ CODIGOS_VERMELHO = {
         "DD7650909D02EA03DD155714A731FEF3", "3A170A9FE4F47EFA37D23AD521B9098E",
         "D742FFBECE435C9076FBA5F244396CF8", "60274C1AC606DDDFAB591309CB5ACE78"
     ],
-
     "OCULOS": [
         "A4385FDA98A439AEDE464B18924ABAEA", "D5AC5A27C34EBFD7A1DBD16D5B99EDFB",
         "7866CC7FB5A03C016EFD4D506A451850", "0DD954EA204F19A1B391B7828491927B",
         "4D6237DF5AB8CC9E1268B8086182979D", "13CEE27A2BD93915479F049378CFFDD3"
     ],
-
     "CHIFRE": [
         "98C6F2C2287F4C73CEA3D40AE7EC3FF2", "DCA19FFA163054FEEF33432FAD5F9833",
         "B772D43B49BB57B596D0343C33BCFFEC", "A12F16C644039099699332E247F11EC0",
         "6AB5DBC886D46770A86E6CC0BE54A9D1", "435C44C266BC0C05F7B6F48E7A454F1C"
     ],
-
     "SEM ACESSORIO": [
         "A514839C4971406FF865A3F340E4EA36", "C9E6E7B69F98F516A54CFE2C9E25FB3F",
         "421D13C7ECD67604CEDBE44F88DD1F61", "19A1DE167122A18AF369C749F4E40A48",
@@ -83,30 +75,23 @@ CODIGOS_VERMELHO = {
     ]
 }
 
-
 TODOS_ACESSORIOS = set(CODIGOS_AZUL.keys()) | set(CODIGOS_VERMELHO.keys())
 
 
 # =========================================================
-# LEARNING ENGINE (NOVO CORE)
+# LEARNING ENGINE
 # =========================================================
 
 def atualizar_pesos(acessorio, cor, resultado):
-    """
-    resultado: "win" ou "loss"
-    """
-
     key = (cor, acessorio)
 
     if resultado == "win":
-        PESOS_DINAMICOS[key] += 0.05  # crescimento lento
+        PESOS_DINAMICOS[key] += 0.05
         HISTORICO_APRENDIZADO[key]["win"] += 1
-
     else:
-        PESOS_DINAMICOS[key] -= 0.03  # queda lenta
+        PESOS_DINAMICOS[key] -= 0.03
         HISTORICO_APRENDIZADO[key]["loss"] += 1
 
-    # limites suaves (evita colapso)
     PESOS_DINAMICOS[key] = max(0.3, min(2.5, PESOS_DINAMICOS[key]))
 
 
@@ -232,7 +217,6 @@ def prever_proximo_acessorio():
             continue
 
         votos = []
-        predicoes_janelas = []
         pesos_base = {6: 1.5, 5: 1.2, 4: 1.0}
 
         for janela in [6, 5, 4]:
@@ -252,16 +236,10 @@ def prever_proximo_acessorio():
             pred = max(probs, key=probs.get)
             taxa = probs[pred]
 
-            peso = PESOS_DINAMICOS[(cor_nome, pred)]
-
             if taxa > 0.75:
-                predicoes_janelas.append(pred)
                 votos.append(pred)
 
-        if len(predicoes_janelas) < 2:
-            continue
-
-        if not votos:
+        if len(votos) < 2:
             continue
 
         final = Counter(votos)
@@ -278,7 +256,6 @@ def prever_proximo_acessorio():
     cor, (acessorio, confianca) = max(resultados.items(), key=lambda x: x[1][1])
 
     if acessorio not in TODOS_ACESSORIOS:
-        print("⚠️ Acessório inválido")
         return None
 
     ultima_previsao_acessorio = acessorio
@@ -294,13 +271,12 @@ def prever_proximo_acessorio():
 
 
 # =========================================================
-# VALIDAÇÃO (CORE DO APRENDIZADO)
+# VALIDAÇÃO
 # =========================================================
 
 def processar_validacao_acessorio():
     global acessorio_wins, acessorio_loss
     global ultima_previsao_acessorio, ultimo_codigo_processado
-    global ultima_confianca_acessorio
 
     try:
         with open("sequencias.csv", "r", encoding="utf-8") as f:
@@ -314,18 +290,20 @@ def processar_validacao_acessorio():
 
     ultimo_codigo_processado = codigo_real
 
-    _, acessorio_real = identificar_cor_acessorio(codigo_real)
+    cor_real, acessorio_real = identificar_cor_acessorio(codigo_real)
 
     if acessorio_real == "DESCONHECIDO" or not ultima_previsao_acessorio:
         return
 
-    # aprendizado contínuo
     if acessorio_real == ultima_previsao_acessorio:
+
         acessorio_wins += 1
-        atualizar_pesos(acessorio_real, "GLOBAL", "win")
+        atualizar_pesos(acessorio_real, cor_real, "win")
+
     else:
+
         acessorio_loss += 1
-        atualizar_pesos(ultima_previsao_acessorio, "GLOBAL", "loss")
+        atualizar_pesos(ultima_previsao_acessorio, cor_real, "loss")
 
 
 # =========================================================
