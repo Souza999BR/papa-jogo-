@@ -15,7 +15,7 @@ ultimo_codigo_processado = None
 ultimo_reset_hora = None
 
 # =========================================================
-# LEARNING ENGINE AVANÇADO
+# CACHE + PESOS DINÂMICOS (LEARNING ENGINE)
 # =========================================================
 
 CACHE_PADROES = {}
@@ -24,9 +24,6 @@ PESOS_DINAMICOS = defaultdict(lambda: 1.0)
 
 HISTORICO_APRENDIZADO = defaultdict(lambda: {"win": 0, "loss": 0})
 
-HISTORICO_HORA = defaultdict(lambda: defaultdict(lambda: {"win": 0, "loss": 0}))
-
-RECENCIA_BUFFER = []
 
 # =========================================================
 # MAPA POR COR (IMAGENS)
@@ -87,29 +84,23 @@ CODIGOS_VERMELHO = {
 
 TODOS_ACESSORIOS = set(CODIGOS_AZUL.keys()) | set(CODIGOS_VERMELHO.keys())
 
+
 # =========================================================
-# UPDATE PESOS (MARKOV + PENALIDADE + HORA)
+# LEARNING ENGINE
 # =========================================================
 
 def atualizar_pesos(acessorio, cor, resultado):
-    global HISTORICO_HORA
-
     key = (cor, acessorio)
-    hora = datetime.now().hour
 
     if resultado == "win":
-
-        PESOS_DINAMICOS[key] += 0.06
+        PESOS_DINAMICOS[key] += 0.05
         HISTORICO_APRENDIZADO[key]["win"] += 1
-        HISTORICO_HORA[hora][key]["win"] += 1
-
     else:
-
-        PESOS_DINAMICOS[key] -= 0.05
+        PESOS_DINAMICOS[key] -= 0.03
         HISTORICO_APRENDIZADO[key]["loss"] += 1
-        HISTORICO_HORA[hora][key]["loss"] += 1
 
-    PESOS_DINAMICOS[key] = max(0.25, min(3.0, PESOS_DINAMICOS[key]))
+    PESOS_DINAMICOS[key] = max(0.3, min(2.5, PESOS_DINAMICOS[key]))
+
 
 # =========================================================
 # RESET
@@ -130,7 +121,11 @@ def resetar_por_hora(caminho_resultados):
     ultima_previsao_acessorio = None
     ultimo_codigo_processado = None
 
+    with open(caminho_resultados, "w", encoding="utf-8") as f:
+        f.write("resultado\n")
+
     print("⏰ RESET ACESSÓRIO OK")
+
 
 # =========================================================
 # IDENTIFICAR
@@ -145,6 +140,7 @@ def identificar_cor_acessorio(codigo):
                 return cor, acessorio
 
     return "DESCONHECIDO", "DESCONHECIDO"
+
 
 # =========================================================
 # HISTÓRICO
@@ -172,13 +168,14 @@ def carregar_historico(csv_file="sequencias.csv"):
                 else:
                     vermelho.append(acessorio)
 
-    except:
-        pass
+    except Exception as e:
+        print("⚠️ CSV erro:", e)
 
     return azul, vermelho
 
+
 # =========================================================
-# CACHE PADRÕES (MARKOV)
+# CACHE PADRÕES
 # =========================================================
 
 def gerar_padroes_cache(hist, janela):
@@ -192,11 +189,11 @@ def gerar_padroes_cache(hist, janela):
     for i in range(len(hist) - janela):
         seq = tuple(hist[i:i + janela])
         prox = hist[i + janela]
-
         padroes.setdefault(seq, []).append(prox)
 
     CACHE_PADROES[key] = padroes
     return padroes
+
 
 # =========================================================
 # BAYES
@@ -205,27 +202,29 @@ def gerar_padroes_cache(hist, janela):
 def bayes_probabilidade(seq, proximos):
     cont = Counter(proximos)
     total = sum(cont.values())
-
     return {k: v / total for k, v in cont.items()}
 
+
 # =========================================================
-# PREVISÃO (COM MARKOV + RECÊNCIA + HORA)
+# PREVISÃO
 # =========================================================
 
 def prever_proximo_acessorio():
-    global ultima_previsao_acessorio, ultima_confianca_acessorio, RECENCIA_BUFFER
+    global ultima_previsao_acessorio, ultima_confianca_acessorio
 
     historico_azul, historico_vermelho = carregar_historico()
     resultados = {}
 
-    hora = datetime.now().hour
-
-    for cor_nome, historico in [("AZUL", historico_azul), ("VERMELHO", historico_vermelho)]:
+    for cor_nome, historico in [
+        ("AZUL", historico_azul),
+        ("VERMELHO", historico_vermelho)
+    ]:
 
         if len(historico) < 10:
             continue
 
         votos = []
+        pesos_base = {6: 1.5, 5: 1.2, 4: 1.0}
 
         for janela in [6, 5, 4]:
 
@@ -239,42 +238,37 @@ def prever_proximo_acessorio():
                 continue
 
             proximos = padroes[seq]
-
             probs = bayes_probabilidade(seq, proximos)
 
             pred = max(probs, key=probs.get)
             taxa = probs[pred]
 
-            peso = PESOS_DINAMICOS[(cor_nome, pred)]
+            if taxa > 0.75:
+                votos.append(pred)
 
-            # BOOST RECÊNCIA
-            if pred in RECENCIA_BUFFER[-10:]:
-                peso *= 1.2
-
-            # BOOST HORA
-            hora_boost = HISTORICO_HORA[hora][(cor_nome, pred)]["win"] + 1
-
-            score = taxa * peso * hora_boost
-
-            votos.append((pred, score))
-
-        if not votos:
+        if len(votos) < 2:
             continue
 
-        votos.sort(key=lambda x: x[1], reverse=True)
+        final = Counter(votos)
+        acessorio = final.most_common(1)[0][0]
+        confianca = (final[acessorio] / sum(final.values())) * 100
 
-        acessorio = votos[0][0]
-        confianca = min(votos[0][1] * 100, 99.9)
-
-        resultados[cor_nome] = (acessorio, confianca)
+        if confianca > 75:
+            resultados[cor_nome] = (acessorio, confianca)
 
     if not resultados:
+        print("❌ Sem previsão")
         return None
 
     cor, (acessorio, confianca) = max(resultados.items(), key=lambda x: x[1][1])
 
+    if acessorio not in TODOS_ACESSORIOS:
+        return None
+
     ultima_previsao_acessorio = acessorio
     ultima_confianca_acessorio = confianca
+
+    print(f"🎯 PREVISÃO: {cor} | {acessorio} | {confianca:.2f}%")
 
     return {
         "cor": cor,
@@ -282,13 +276,14 @@ def prever_proximo_acessorio():
         "confianca": round(confianca, 2)
     }
 
+
 # =========================================================
 # VALIDAÇÃO
 # =========================================================
 
 def processar_validacao_acessorio():
     global acessorio_wins, acessorio_loss
-    global ultima_previsao_acessorio, ultimo_codigo_processado, RECENCIA_BUFFER
+    global ultima_previsao_acessorio, ultimo_codigo_processado
 
     try:
         with open("sequencias.csv", "r", encoding="utf-8") as f:
@@ -307,15 +302,16 @@ def processar_validacao_acessorio():
     if acessorio_real == "DESCONHECIDO" or not ultima_previsao_acessorio:
         return
 
-    RECENCIA_BUFFER.append(acessorio_real)
-    RECENCIA_BUFFER = RECENCIA_BUFFER[-50:]
-
     if acessorio_real == ultima_previsao_acessorio:
+
         acessorio_wins += 1
         atualizar_pesos(acessorio_real, cor_real, "win")
+
     else:
+
         acessorio_loss += 1
         atualizar_pesos(ultima_previsao_acessorio, cor_real, "loss")
+
 
 # =========================================================
 # RESULTADO

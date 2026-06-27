@@ -81,6 +81,8 @@ ultima_hora_relatorio_enviado = None
 
 obter_resultado_acessorio()
 
+ultima_validacao_acessorio = None
+
 resultados = []
 
 ultima_hora_reset = datetime.now().hour
@@ -728,6 +730,7 @@ async def loop_previsoes():
     global ultima_hora_reset
     global historico_tendencia
     global ultima_hora_relatorio
+    global ultima_validacao_acessorio
 
     print("🚀 Sistema iniciado!")
 
@@ -813,7 +816,14 @@ async def loop_previsoes():
 
                 # ================= VALIDAÇÃO ACESSÓRIO =================
                 try:
-                    processar_validacao_acessorio()
+                    chave_validacao = (
+                        agora.strftime("%Y-%m-%d %H:%M"),
+                        codigo_atual
+                    )
+                    if chave_validacao != ultima_validacao_acessorio:
+                        processar_validacao_acessorio()
+                        ultima_validacao_acessorio = chave_validacao
+                        
                 except Exception as e:
                     print(f"⚠️ Erro validação acessório: {e}")
 
