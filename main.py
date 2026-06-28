@@ -15,7 +15,7 @@ from telegram.error import TelegramError
 
 from telegram.request import HTTPXRequest
 
-
+from acessorio import ativar_previsao_acessorio
 
 from telegram.ext import (
     Application,
@@ -942,6 +942,9 @@ async def loop_previsoes():
                     "cor": previsao_cor,
                     "codigo": previsao_codigo
                 }
+                
+                if acessorio_previsto:
+                    ativar_previsao_acessorio()
 
                 await enviar_previsao(
                     previsao_cor,

@@ -13,6 +13,7 @@ ultima_previsao_acessorio = None
 ultima_confianca_acessorio = 0
 ultimo_codigo_processado = None
 ultimo_reset_hora = None
+previsao_acessorio_ativa = False
 
 # =========================================================
 # CACHE + PESOS DINÂMICOS (LEARNING ENGINE)
@@ -126,7 +127,15 @@ def resetar_por_hora(caminho_resultados):
 
     print("⏰ RESET ACESSÓRIO OK")
 
+# =========================================================
+# CONTROLE DE VALIDAÇÃO
+# =========================================================
 
+def ativar_previsao_acessorio():
+    global previsao_acessorio_ativa
+
+    previsao_acessorio_ativa = True
+    
 # =========================================================
 # IDENTIFICAR
 # =========================================================
@@ -210,7 +219,9 @@ def bayes_probabilidade(seq, proximos):
 # =========================================================
 
 def prever_proximo_acessorio():
-    global ultima_previsao_acessorio, ultima_confianca_acessorio
+    global ultima_previsao_acessorio
+    global ultima_confianca_acessorio
+    global previsao_acessorio_ativa
 
     historico_azul, historico_vermelho = carregar_historico()
     resultados = {}
@@ -267,6 +278,7 @@ def prever_proximo_acessorio():
 
     ultima_previsao_acessorio = acessorio
     ultima_confianca_acessorio = confianca
+    previsao_acessorio_ativa = False
 
     print(f"🎯 PREVISÃO: {cor} | {acessorio} | {confianca:.2f}%")
 
@@ -283,7 +295,9 @@ def prever_proximo_acessorio():
 
 def processar_validacao_acessorio():
     global acessorio_wins, acessorio_loss
-    global ultima_previsao_acessorio, ultimo_codigo_processado
+    global ultima_previsao_acessorio
+    global ultimo_codigo_processado
+    global previsao_acessorio_ativa
 
     try:
         with open("sequencias.csv", "r", encoding="utf-8") as f:
@@ -298,6 +312,9 @@ def processar_validacao_acessorio():
     ultimo_codigo_processado = codigo_real
 
     cor_real, acessorio_real = identificar_cor_acessorio(codigo_real)
+    
+    if not previsao_acessorio_ativa:
+        return
 
     if acessorio_real == "DESCONHECIDO" or not ultima_previsao_acessorio:
         return
