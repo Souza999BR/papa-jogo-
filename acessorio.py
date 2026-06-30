@@ -292,31 +292,58 @@ def prever_proximo_acessorio():
 # =========================================================
 # VALIDAÇÃO
 # =========================================================
+def ativar_previsao_acessorio():
+    global previsao_acessorio_ativa
 
+    previsao_acessorio_ativa = True
+    
+def cancelar_previsao_acessorio():
+    global previsao_acessorio_ativa
+    global ultima_previsao_acessorio
+    global ultima_confianca_acessorio
+
+    previsao_acessorio_ativa = False
+    ultima_previsao_acessorio = None
+    ultima_confianca_acessorio = 0
+    
 def processar_validacao_acessorio():
     global acessorio_wins, acessorio_loss
     global ultima_previsao_acessorio
     global ultimo_codigo_processado
     global previsao_acessorio_ativa
 
+    # Só valida se realmente foi enviado um acessório
+    if not previsao_acessorio_ativa:
+        return
+
+    if not ultima_previsao_acessorio:
+        return
+
     try:
         with open("sequencias.csv", "r", encoding="utf-8") as f:
             reader = list(csv.DictReader(f))
-            codigo_real = reader[-1].get("Codigo", "").strip().upper()
-    except:
+
+        if not reader:
+            return
+
+        codigo_real = reader[-1].get("Codigo", "").strip().upper()
+
+    except Exception:
         return
 
-    if not codigo_real or codigo_real == ultimo_codigo_processado:
+    if not codigo_real:
+        return
+
+    # Evita validar duas vezes o mesmo resultado
+    if codigo_real == ultimo_codigo_processado:
         return
 
     ultimo_codigo_processado = codigo_real
 
     cor_real, acessorio_real = identificar_cor_acessorio(codigo_real)
-    
-    if not previsao_acessorio_ativa:
-        return
 
-    if acessorio_real == "DESCONHECIDO" or not ultima_previsao_acessorio:
+    if acessorio_real == "DESCONHECIDO":
+        cancelar_previsao_acessorio()
         return
 
     if acessorio_real == ultima_previsao_acessorio:
@@ -329,6 +356,8 @@ def processar_validacao_acessorio():
         acessorio_loss += 1
         atualizar_pesos(ultima_previsao_acessorio, cor_real, "loss")
 
+    # Finaliza a previsão após contabilizar
+    cancelar_previsao_acessorio()
 
 # =========================================================
 # RESULTADO

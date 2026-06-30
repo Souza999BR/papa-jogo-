@@ -34,6 +34,7 @@ from acessorio import (
     prever_proximo_acessorio,
     obter_resultado_acessorio,
     processar_validacao_acessorio,
+    cancelar_previsao_acessorio,
     CODIGOS_AZUL,
     CODIGOS_VERMELHO
 )
@@ -921,6 +922,8 @@ async def loop_previsoes():
                         print(
                             f"🔑 Código forte detectado ({confianca:.1%}) - acessório bloqueado"
                         )
+                        
+                        cancelar_previsao_acessorio()
 
                     if usar_acessorio:
 
@@ -943,8 +946,7 @@ async def loop_previsoes():
                     "codigo": previsao_codigo
                 }
                 
-                if acessorio_previsto:
-                    ativar_previsao_acessorio()
+                
 
                 await enviar_previsao(
                     previsao_cor,
@@ -952,6 +954,9 @@ async def loop_previsoes():
                     confianca,
                     acessorio_previsto
                 )
+                
+                if usar_acessorio and acessorio_previsto:
+                    ativar_previsao_acessorio()
 
             # ================= ESPERA =================
             proximo = (agora + timedelta(minutes=1)).replace(
