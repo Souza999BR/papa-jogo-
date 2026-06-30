@@ -103,7 +103,7 @@ def gerar_padroes(
 
     for entrada, (saida, freq) in melhores.items():
 
-        if freq < 3:
+        if freq < 2:
             continue
 
         # =====================================
