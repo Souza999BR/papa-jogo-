@@ -231,7 +231,7 @@ def prever_proximo_acessorio():
         ("VERMELHO", historico_vermelho)
     ]:
 
-        if len(historico) < 10:
+        if len(historico) < 24:
             continue
 
         votos = []
