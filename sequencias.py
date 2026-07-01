@@ -571,7 +571,7 @@ def calcular_previsao_exata_por_cor(
     import ast
     from datetime import datetime
 
-    if len(historico_cores) < 30:
+    if len(historico_cores) < 20:
         return None
 
     if not horarios_sao_consecutivos(historico_cores):
