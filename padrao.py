@@ -49,7 +49,7 @@ def gerar_padroes(
     cores,
     tamanho_min=4,
     tamanho_max=5,
-    top=20
+    top=10
 ):
     """
     Gera padrões mais fortes do histórico.
@@ -103,7 +103,7 @@ def gerar_padroes(
 
     for entrada, (saida, freq) in melhores.items():
 
-        if freq < 3:
+        if freq < 2:
             continue
 
         # =====================================
