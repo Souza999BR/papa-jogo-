@@ -28,7 +28,7 @@ def filtrar_sequencias_consecutivas(historico):
     Filtra apenas os registros que estão em sequência minuto a minuto.
     Retorna uma lista contendo SOMENTE os registros consecutivos.
     """
-    if len(historico) < 11:
+    if len(historico) < 16:
         return []
 
     consecutivos = [historico[0]]
@@ -42,7 +42,7 @@ def filtrar_sequencias_consecutivas(historico):
         else:
             consecutivos = [historico[i]]
 
-    return consecutivos if len(consecutivos) > 11 else []
+    return consecutivos if len(consecutivos) > 16 else []
 
 
 def gerar_padroes(
@@ -173,7 +173,7 @@ if __name__ == "__main__":
     historico_completo = carregar_historico()
     historico_consecutivo = filtrar_sequencias_consecutivas(historico_completo)
 
-    if len(historico_consecutivo) < 11:
+    if len(historico_consecutivo) < 16:
         print("⚠️ Nenhuma sequência consecutiva suficiente encontrada.")
     else:
         cores_filtradas = [c for _, c in historico_consecutivo]
