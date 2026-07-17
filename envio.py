@@ -1,9 +1,19 @@
+import os
 import time
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Configurações do bot
-BOT_TOKEN = "5965310119:AAFbNw-r1UgaqMkDn0Ivx4-j-HBPgCKQgFU"
-CHAT_ID = "-4666794010"
+BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
+
+if not BOT_TOKEN or not CHAT_ID:
+    raise RuntimeError(
+        "TELEGRAM_TOKEN e CHAT_ID precisam estar definidos nas variaveis de ambiente "
+        "(arquivo .env local ou nas variaveis de ambiente do Discloud)."
+    )
 
 # Lista de links
 links = [

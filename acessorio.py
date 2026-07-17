@@ -15,7 +15,6 @@ ultimo_codigo_processado = None
 ultimo_reset_hora = None
 previsao_acessorio_ativa = False
 
-
 # =========================================================
 # CACHE + PESOS DINÂMICOS (LEARNING ENGINE)
 # =========================================================
@@ -110,10 +109,7 @@ def atualizar_pesos(acessorio, cor, resultado):
 
 def resetar_por_hora(caminho_resultados):
     global ultimo_reset_hora, acessorio_wins, acessorio_loss
-    global ultima_previsao_acessorio
-    global ultima_confianca_acessorio
-    global ultimo_codigo_processado
-    global CACHE_PADROES
+    global ultima_previsao_acessorio, ultimo_codigo_processado
 
     agora = datetime.now().hour
 
@@ -121,21 +117,24 @@ def resetar_por_hora(caminho_resultados):
         return
 
     ultimo_reset_hora = agora
-
     acessorio_wins = 0
     acessorio_loss = 0
-
     ultima_previsao_acessorio = None
-    ultima_confianca_acessorio = 0
-
     ultimo_codigo_processado = None
-
-    CACHE_PADROES.clear()
 
     with open(caminho_resultados, "w", encoding="utf-8") as f:
         f.write("resultado\n")
 
     print("⏰ RESET ACESSÓRIO OK")
+
+# =========================================================
+# CONTROLE DE VALIDAÇÃO
+# =========================================================
+
+def ativar_previsao_acessorio():
+    global previsao_acessorio_ativa
+
+    previsao_acessorio_ativa = True
     
 # =========================================================
 # IDENTIFICAR
@@ -236,11 +235,7 @@ def prever_proximo_acessorio():
             continue
 
         votos = []
-        pesos_base = {
-            6: 1.5,
-            5: 1.2,
-            4: 1.0
-        }
+        pesos_base = {6: 1.5, 5: 1.2, 4: 1.0}
 
         for janela in [6, 5, 4]:
 
@@ -248,77 +243,51 @@ def prever_proximo_acessorio():
                 continue
 
             padroes = gerar_padroes_cache(historico, janela)
-
             seq = tuple(historico[-janela:])
 
             if seq not in padroes:
                 continue
 
             proximos = padroes[seq]
-
             probs = bayes_probabilidade(seq, proximos)
 
             pred = max(probs, key=probs.get)
-
             taxa = probs[pred]
 
-            peso_janela = pesos_base[janela]
-
-            peso_aprendizado = PESOS_DINAMICOS[(cor_nome, pred)]
-
-            score = taxa * peso_janela * peso_aprendizado
-
-            votos.append((pred, score))
+            if taxa > 0.75:
+                votos.append(pred)
 
         if len(votos) < 2:
             continue
 
-        pontuacao = defaultdict(float)
+        final = Counter(votos)
+        acessorio = final.most_common(1)[0][0]
+        confianca = (final[acessorio] / sum(final.values())) * 100
 
-        for pred, score in votos:
-            pontuacao[pred] += score
-
-        acessorio = max(pontuacao, key=pontuacao.get)
-
-        confianca = (
-            pontuacao[acessorio]
-            / sum(pontuacao.values())
-        ) * 100
-
-        resultados[cor_nome] = (
-            acessorio,
-            round(confianca, 2)
-        )
+        if confianca > 75:
+            resultados[cor_nome] = (acessorio, confianca)
 
     if not resultados:
         print("❌ Sem previsão")
         return None
 
-    cor, (acessorio, confianca) = max(
-        resultados.items(),
-        key=lambda x: x[1][1]
-    )
+    cor, (acessorio, confianca) = max(resultados.items(), key=lambda x: x[1][1])
 
     if acessorio not in TODOS_ACESSORIOS:
         return None
 
     ultima_previsao_acessorio = acessorio
     ultima_confianca_acessorio = confianca
-
     previsao_acessorio_ativa = False
 
-    print(
-        f"🎯 PREVISÃO: "
-        f"{cor} | "
-        f"{acessorio} | "
-        f"{confianca:.2f}%"
-    )
+    print(f"🎯 PREVISÃO: {cor} | {acessorio} | {confianca:.2f}%")
 
     return {
         "cor": cor,
         "acessorio": acessorio,
         "confianca": round(confianca, 2)
     }
+
 
 # =========================================================
 # VALIDAÇÃO

@@ -6,3 +6,4 @@ aiohttp
 beautifulsoup4
 bs4
 lxml
+python-dotenv

@@ -1,11 +1,21 @@
 import asyncio
+import os
 import requests
 from datetime import datetime
+from dotenv import load_dotenv
 from telegram import Bot
 
+load_dotenv()
+
 # Configuração do Telegram
-TELEGRAM_TOKEN = "5965310119:AAFbNw-r1UgaqMkDn0Ivx4-j-HBPgCKQgFU"
-CHAT_ID = "-4666794010"
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
+
+if not TELEGRAM_TOKEN or not CHAT_ID:
+    raise RuntimeError(
+        "TELEGRAM_TOKEN e CHAT_ID precisam estar definidos nas variaveis de ambiente "
+        "(arquivo .env local ou nas variaveis de ambiente do Discloud)."
+    )
 
 bot = Bot(token=TELEGRAM_TOKEN)
 

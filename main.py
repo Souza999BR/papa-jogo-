@@ -54,9 +54,19 @@ from sequencias import (
 )
 
 # ================= CONFIGURAÇÕES =================
-BOT_TOKEN = "8792510244:AAFWxxM3vrX659FvQG523S-yYmFNzoiFFaU"
+from dotenv import load_dotenv
 
-CHAT_ID = "-1003937478657"
+load_dotenv()
+
+BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
+
+CHAT_ID = os.getenv("CHAT_ID")
+
+if not BOT_TOKEN or not CHAT_ID:
+    raise RuntimeError(
+        "TELEGRAM_TOKEN e CHAT_ID precisam estar definidos nas variaveis de ambiente "
+        "(arquivo .env local ou nas variaveis de ambiente do Discloud)."
+    )
 
 request = HTTPXRequest(
     connect_timeout=30,
