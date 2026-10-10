@@ -996,6 +996,7 @@ async def main():
     app = (
         Application.builder()
         .token(BOT_TOKEN)
+        .request(request)
         .build()
     )
 
@@ -1006,27 +1007,124 @@ async def main():
         )
     )
 
+    # =====================================================
+    # INICIALIZA O BOT ANTES DE ALTERAR O WEBHOOK
+    # =====================================================
+    await app.initialize()
+
+    # =====================================================
+    # REMOVE WEBHOOK ANTES DO POLLING
+    #
+    # O Telegram nao permite getUpdates (polling) enquanto
+    # existir um webhook ativo para o mesmo bot.
+    # Fazemos a remocao e confirmamos o estado antes de
+    # iniciar o updater. Isso evita o Conflict no Discloud.
+    # =====================================================
+    webhook_removido = False
+
+    for tentativa in range(1, 4):
+
+        try:
+            webhook_info = await app.bot.get_webhook_info()
+            webhook_url = webhook_info.url or ""
+
+            if webhook_url:
+                print(
+                    f"⚠️ Webhook ativo detectado "
+                    f"(tentativa {tentativa}/3): {webhook_url}"
+                )
+            else:
+                print(
+                    f"ℹ️ Nenhum webhook ativo "
+                    f"(tentativa {tentativa}/3)."
+                )
+
+            await app.bot.delete_webhook(
+                drop_pending_updates=True
+            )
+
+            # Confirma que o Telegram realmente ficou sem webhook.
+            webhook_check = await app.bot.get_webhook_info()
+
+            if not webhook_check.url:
+                webhook_removido = True
+                print("✅ Webhook removido. Polling liberado.")
+                break
+
+            print(
+                "⚠️ O webhook ainda aparece ativo. "
+                "Tentando novamente..."
+            )
+
+        except Exception as e:
+
+            print(
+                f"⚠️ Erro ao remover webhook "
+                f"(tentativa {tentativa}/3): {e}"
+            )
+
+        if tentativa < 3:
+            await asyncio.sleep(2)
+
+    if not webhook_removido:
+        print(
+            "❌ Não foi possível confirmar a remoção do webhook. "
+            "O polling não será iniciado para evitar conflito com o Telegram."
+        )
+
+        await app.shutdown()
+        return
+
+    # =====================================================
+    # INICIA A APLICAÇÃO
+    # =====================================================
+    await app.start()
+
+    # =====================================================
+    # INICIA O POLLING SOMENTE DEPOIS DO WEBHOOK REMOVIDO
+    # =====================================================
+    await app.updater.start_polling(
+        drop_pending_updates=True
+    )
+
+    print("🤖 Bot comandos iniciado!")
+    print("📡 Polling iniciado com sucesso!")
+
+    # =====================================================
+    # LOOP DE PREVISÕES
+    # =====================================================
     asyncio.create_task(
         loop_previsoes()
     )
 
-    print("🤖 Bot comandos iniciado!")
+    # =====================================================
+    # MANTÉM O PROCESSO ATIVO NO DISCLOUD
+    # =====================================================
+    try:
 
-    await app.initialize()
+        while True:
+            await asyncio.sleep(3600)
 
-    # =====================================
-    # REMOVE WEBHOOK CASO EXISTA
-    # =====================================
-    await app.bot.delete_webhook(
-        drop_pending_updates=True
-    )
+    except asyncio.CancelledError:
 
-    await app.start()
+        print("🛑 Encerrando bot...")
 
-    await app.updater.start_polling()
+        try:
+            await app.updater.stop()
+        except Exception:
+            pass
 
-    while True:
-        await asyncio.sleep(3600)
+        try:
+            await app.stop()
+        except Exception:
+            pass
+
+        try:
+            await app.shutdown()
+        except Exception:
+            pass
+
+        raise
 
 # =========================================================
 # START
