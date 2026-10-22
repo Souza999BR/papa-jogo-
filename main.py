@@ -416,11 +416,6 @@ async def enviar_previsao(
         f"{linha_previsao}"
     )
 
-    # A previsão de acessório só pode entrar no placar se este campo
-    # fizer parte da mensagem realmente enviada ao Telegram.
-    if acessorio:
-        mensagem += f"\n🎩 Acessório previsto: {acessorio}"
-
     # =====================================================
     # CÓDIGO PREVISTO — rótulo conforme a análise que gerou o sinal
     # =====================================================
@@ -1066,12 +1061,7 @@ async def loop_previsoes():
 
                     if usar_acessorio and acessorio_previsto:
                         ativar_previsao_acessorio()
-                    else:
-                        cancelar_previsao_acessorio()
                 else:
-                    # A mensagem falhou: não pode deixar previsão de acessório
-                    # pendente nem somá-la ao placar quando chegar o resultado.
-                    cancelar_previsao_acessorio()
                     ultima_previsao = None
                     print("⚠️ Previsão não enviada ao Telegram; não será incluída no placar.")
 

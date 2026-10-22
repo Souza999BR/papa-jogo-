@@ -10,19 +10,20 @@ acessorio_wins = 0
 acessorio_loss = 0
 
 ultima_previsao_acessorio = None
-# Só entra no placar quando a previsão de acessório foi enviada ao Telegram.
-acessorio_pendente_telegram = None
+ultima_confianca_acessorio = 0
 ultimo_codigo_processado = None
 ultimo_reset_hora = None
+previsao_acessorio_ativa = False
 
 # =========================================================
-# CACHE + PESOS DINÂMICOS
+# CACHE + PESOS DINÂMICOS (LEARNING ENGINE)
 # =========================================================
 
 CACHE_PADROES = {}
+
 PESOS_DINAMICOS = defaultdict(lambda: 1.0)
 
-PROBABILIDADES = defaultdict(lambda: defaultdict(lambda: 1))
+HISTORICO_APRENDIZADO = defaultdict(lambda: {"win": 0, "loss": 0})
 
 
 # =========================================================
@@ -81,14 +82,34 @@ CODIGOS_VERMELHO = {
     ]
 }
 
+
+TODOS_ACESSORIOS = set(CODIGOS_AZUL.keys()) | set(CODIGOS_VERMELHO.keys())
+
+
 # =========================================================
-# RESET POR HORA
+# LEARNING ENGINE
+# =========================================================
+
+def atualizar_pesos(acessorio, cor, resultado):
+    key = (cor, acessorio)
+
+    if resultado == "win":
+        PESOS_DINAMICOS[key] += 0.05
+        HISTORICO_APRENDIZADO[key]["win"] += 1
+    else:
+        PESOS_DINAMICOS[key] -= 0.03
+        HISTORICO_APRENDIZADO[key]["loss"] += 1
+
+    PESOS_DINAMICOS[key] = max(0.3, min(2.5, PESOS_DINAMICOS[key]))
+
+
+# =========================================================
+# RESET
 # =========================================================
 
 def resetar_por_hora(caminho_resultados):
-    global ultimo_reset_hora
-    global acessorio_wins, acessorio_loss
-    global ultima_previsao_acessorio, acessorio_pendente_telegram, ultimo_codigo_processado
+    global ultimo_reset_hora, acessorio_wins, acessorio_loss
+    global ultima_previsao_acessorio, ultimo_codigo_processado
 
     agora = datetime.now().hour
 
@@ -96,50 +117,27 @@ def resetar_por_hora(caminho_resultados):
         return
 
     ultimo_reset_hora = agora
-
-    print("⏰ RESET DE HORA EXECUTADO")
+    acessorio_wins = 0
+    acessorio_loss = 0
+    ultima_previsao_acessorio = None
+    ultimo_codigo_processado = None
 
     with open(caminho_resultados, "w", encoding="utf-8") as f:
         f.write("resultado\n")
 
-    acessorio_wins = 0
-    acessorio_loss = 0
-    ultima_previsao_acessorio = None
-    acessorio_pendente_telegram = None
-    ultimo_codigo_processado = None
-
-    print("🗑️ Estatísticas resetadas")
-
+    print("⏰ RESET ACESSÓRIO OK")
 
 # =========================================================
-# CONTROLE DE PREVISÕES REALMENTE ENVIADAS AO TELEGRAM
+# CONTROLE DE VALIDAÇÃO
 # =========================================================
 
 def ativar_previsao_acessorio():
-    """Registra como válida para o placar apenas a previsão enviada."""
-    global acessorio_pendente_telegram
+    global previsao_acessorio_ativa
 
-    if ultima_previsao_acessorio:
-        acessorio_pendente_telegram = ultima_previsao_acessorio
-        print(
-            f"📨 Acessório registrado para validação: "
-            f"{acessorio_pendente_telegram}"
-        )
-        return True
-
-    acessorio_pendente_telegram = None
-    return False
-
-
-def cancelar_previsao_acessorio():
-    """Descarta a previsão de acessório para não contaminar o placar."""
-    global ultima_previsao_acessorio, acessorio_pendente_telegram
-    ultima_previsao_acessorio = None
-    acessorio_pendente_telegram = None
-
-
+    previsao_acessorio_ativa = True
+    
 # =========================================================
-# IDENTIFICAR COR + ACESSÓRIO
+# IDENTIFICAR
 # =========================================================
 
 def identificar_cor_acessorio(codigo):
@@ -158,12 +156,11 @@ def identificar_cor_acessorio(codigo):
 # =========================================================
 
 def carregar_historico(csv_file="sequencias.csv"):
-    historico_azul = []
-    historico_vermelho = []
+    azul, vermelho = [], []
 
     try:
-        with open(csv_file, "r", encoding="utf-8") as file:
-            reader = list(csv.DictReader(file))
+        with open(csv_file, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
 
             for row in reader:
                 codigo = row.get("Codigo", "").strip().upper()
@@ -176,32 +173,31 @@ def carregar_historico(csv_file="sequencias.csv"):
                     continue
 
                 if cor == "AZUL":
-                    historico_azul.append(acessorio)
+                    azul.append(acessorio)
                 else:
-                    historico_vermelho.append(acessorio)
+                    vermelho.append(acessorio)
 
     except Exception as e:
-        print(f"⚠️ Erro CSV: {e}")
+        print("⚠️ CSV erro:", e)
 
-    return historico_azul, historico_vermelho
+    return azul, vermelho
 
 
 # =========================================================
-# CACHE DE PADRÕES (⚡ MAIS RÁPIDO)
+# CACHE PADRÕES
 # =========================================================
 
-def gerar_padroes_cache(historico, janela):
-    key = (tuple(historico), janela)
+def gerar_padroes_cache(hist, janela):
+    key = (tuple(hist), janela)
 
     if key in CACHE_PADROES:
         return CACHE_PADROES[key]
 
     padroes = {}
 
-    for i in range(len(historico) - janela):
-        seq = tuple(historico[i:i + janela])
-        prox = historico[i + janela]
-
+    for i in range(len(hist) - janela):
+        seq = tuple(hist[i:i + janela])
+        prox = hist[i + janela]
         padroes.setdefault(seq, []).append(prox)
 
     CACHE_PADROES[key] = padroes
@@ -209,57 +205,36 @@ def gerar_padroes_cache(historico, janela):
 
 
 # =========================================================
-# BAYES SIMPLES (🧠 INTELIGÊNCIA)
+# BAYES
 # =========================================================
 
 def bayes_probabilidade(seq, proximos):
     cont = Counter(proximos)
-
     total = sum(cont.values())
-
-    probs = {}
-    for k, v in cont.items():
-        probs[k] = v / total
-
-    return probs
+    return {k: v / total for k, v in cont.items()}
 
 
 # =========================================================
-# DASHBOARD
-# =========================================================
-
-def dashboard(cor, acessorio, confianca):
-    total = acessorio_wins + acessorio_loss
-    taxa = (acessorio_wins / total * 100) if total else 0
-
-    print("\n================ DASHBOARD ================")
-    print(f"COR: {cor}")
-    print(f"PREVISÃO: {acessorio}")
-    print(f"CONFIANÇA: {confianca:.2f}%")
-    print(f"WINS: {acessorio_wins} | LOSS: {acessorio_loss}")
-    print(f"ACURÁCIA: {taxa:.2f}%")
-    print("===========================================\n")
-
-
-# =========================================================
-# PREVISÃO PRINCIPAL
+# PREVISÃO
 # =========================================================
 
 def prever_proximo_acessorio():
     global ultima_previsao_acessorio
+    global ultima_confianca_acessorio
+    global previsao_acessorio_ativa
 
     historico_azul, historico_vermelho = carregar_historico()
-
     resultados = {}
 
-    for cor_nome, historico in [("AZUL", historico_azul), ("VERMELHO", historico_vermelho)]:
+    for cor_nome, historico in [
+        ("AZUL", historico_azul),
+        ("VERMELHO", historico_vermelho)
+    ]:
 
-        if len(historico) < 10:
+        if len(historico) < 13:
             continue
 
         votos = []
-        predicoes_janelas = []
-
         pesos_base = {6: 1.5, 5: 1.2, 4: 1.0}
 
         for janela in [6, 5, 4]:
@@ -274,36 +249,22 @@ def prever_proximo_acessorio():
                 continue
 
             proximos = padroes[seq]
-
             probs = bayes_probabilidade(seq, proximos)
 
             pred = max(probs, key=probs.get)
             taxa = probs[pred]
 
-            # pesos dinâmicos (aprendem com histórico)
-            peso_dinamico = PESOS_DINAMICOS[(cor_nome, pred)]
+            if taxa > 0.75:
+                votos.append(pred)
 
-            if taxa >= 0.60:
-
-                predicoes_janelas.append(pred)
-
-                votos.extend([pred] * int(taxa * pesos_base[janela] * peso_dinamico * 10))
-
-        if len(predicoes_janelas) < 2:
-            continue
-
-        if len(set(predicoes_janelas)) != 1:
-            continue
-
-        if not votos:
+        if len(votos) < 2:
             continue
 
         final = Counter(votos)
         acessorio = final.most_common(1)[0][0]
-
         confianca = (final[acessorio] / sum(final.values())) * 100
 
-        if confianca >= 70:
+        if confianca > 75:
             resultados[cor_nome] = (acessorio, confianca)
 
     if not resultados:
@@ -312,9 +273,14 @@ def prever_proximo_acessorio():
 
     cor, (acessorio, confianca) = max(resultados.items(), key=lambda x: x[1][1])
 
-    ultima_previsao_acessorio = acessorio
+    if acessorio not in TODOS_ACESSORIOS:
+        return None
 
-    dashboard(cor, acessorio, confianca)
+    ultima_previsao_acessorio = acessorio
+    ultima_confianca_acessorio = confianca
+    previsao_acessorio_ativa = False
+
+    print(f"🎯 PREVISÃO: {cor} | {acessorio} | {confianca:.2f}%")
 
     return {
         "cor": cor,
@@ -324,53 +290,74 @@ def prever_proximo_acessorio():
 
 
 # =========================================================
-# VALIDAÇÃO + APRENDIZADO
+# VALIDAÇÃO
 # =========================================================
+def ativar_previsao_acessorio():
+    global previsao_acessorio_ativa
 
+    previsao_acessorio_ativa = True
+    
+def cancelar_previsao_acessorio():
+    global previsao_acessorio_ativa
+    global ultima_previsao_acessorio
+    global ultima_confianca_acessorio
+
+    previsao_acessorio_ativa = False
+    ultima_previsao_acessorio = None
+    ultima_confianca_acessorio = 0
+    
 def processar_validacao_acessorio():
     global acessorio_wins, acessorio_loss
-    global ultima_previsao_acessorio, acessorio_pendente_telegram
-    global ultimo_codigo_processado, PESOS_DINAMICOS
+    global ultima_previsao_acessorio
+    global ultimo_codigo_processado
+    global previsao_acessorio_ativa
 
-    # Nunca contabiliza uma previsão que não foi confirmada como enviada.
-    if not acessorio_pendente_telegram:
+    # Só valida se realmente foi enviado um acessório
+    if not previsao_acessorio_ativa:
+        return
+
+    if not ultima_previsao_acessorio:
         return
 
     try:
         with open("sequencias.csv", "r", encoding="utf-8") as f:
             reader = list(csv.DictReader(f))
-            if not reader:
-                return
-            codigo_real = reader[-1].get("Codigo", "").strip().upper()
-    except Exception as e:
-        print(f"⚠️ Erro lendo resultado para validar acessório: {e}")
+
+        if not reader:
+            return
+
+        codigo_real = reader[-1].get("Codigo", "").strip().upper()
+
+    except Exception:
         return
 
-    if not codigo_real or codigo_real == ultimo_codigo_processado:
+    if not codigo_real:
         return
 
-    _, acessorio_real = identificar_cor_acessorio(codigo_real)
-    if acessorio_real == "DESCONHECIDO":
+    # Evita validar duas vezes o mesmo resultado
+    if codigo_real == ultimo_codigo_processado:
         return
 
-    previsto = acessorio_pendente_telegram
-    print(f"🎩 Previsto (enviado ao Telegram): {previsto}")
-    print(f"🎩 Real: {acessorio_real}")
-
-    if acessorio_real == previsto:
-        acessorio_wins += 1
-        PESOS_DINAMICOS[("AZUL", acessorio_real)] += 0.05
-        print(f"✅ WIN ACESSÓRIO ({acessorio_wins})")
-    else:
-        acessorio_loss += 1
-        PESOS_DINAMICOS[("AZUL", acessorio_real)] -= 0.02
-        print(f"❌ LOSS ACESSÓRIO ({acessorio_loss})")
-
-    # Consome a previsão para impedir contagem duplicada do mesmo resultado.
     ultimo_codigo_processado = codigo_real
-    acessorio_pendente_telegram = None
-    ultima_previsao_acessorio = None
 
+    cor_real, acessorio_real = identificar_cor_acessorio(codigo_real)
+
+    if acessorio_real == "DESCONHECIDO":
+        cancelar_previsao_acessorio()
+        return
+
+    if acessorio_real == ultima_previsao_acessorio:
+
+        acessorio_wins += 1
+        atualizar_pesos(acessorio_real, cor_real, "win")
+
+    else:
+
+        acessorio_loss += 1
+        atualizar_pesos(ultima_previsao_acessorio, cor_real, "loss")
+
+    # Finaliza a previsão após contabilizar
+    cancelar_previsao_acessorio()
 
 # =========================================================
 # RESULTADO
@@ -378,7 +365,6 @@ def processar_validacao_acessorio():
 
 def obter_resultado_acessorio():
     total = acessorio_wins + acessorio_loss
-
     taxa = (acessorio_wins / total * 100) if total else 0
 
     return {
