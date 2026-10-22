@@ -524,9 +524,22 @@ async def enviar_relatorio():
             leitor = csv.reader(f)
             linhas_csv = list(leitor)
 
-        # Mantém o CSV até o relatório ser entregue com sucesso.
-        # O arquivo não é apagado aqui: se o Telegram falhar na virada
-        # da hora, o bot precisa conseguir reenviar o mesmo placar.
+        if len(linhas_csv) > 1:
+
+            ultima_hora_csv = linhas_csv[-1][0][:13]
+
+            if ultima_hora_csv != hora_atual:
+
+                with open(arquivo_resultados, "w", newline="", encoding="utf-8") as f:
+                    writer = csv.writer(f)
+                    writer.writerow([
+                        "Timestamp",
+                        "Cor",
+                        "Horario",
+                        "Resultado"
+                    ])
+
+                print(f"🗑️ resultados.csv resetado às {hora_atual}:00")
 
     except Exception as e:
         print(f"⚠️ Erro reset CSV: {e}")
@@ -536,48 +549,33 @@ async def enviar_relatorio():
     # =====================================================
     try:
 
-        # Evita gravar duplicados se o Telegram falhar e o relatório
-        # precisar ser tentado novamente.
-        existentes = set()
-        try:
-            with open(arquivo_resultados, "r", newline="", encoding="utf-8") as f:
-                leitor_existente = csv.DictReader(f)
-                for linha in leitor_existente:
-                    existentes.add((
-                        str(linha.get("Cor", "")).strip(),
-                        str(linha.get("Horario", "")).strip(),
-                        str(linha.get("Resultado", "")).strip().upper(),
-                    ))
-        except Exception:
-            pass
-
         with open(arquivo_resultados, "a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
 
             for item in resultados:
+
                 if not item or len(item) < 3:
                     continue
 
                 cor = item[0]
                 horario = item[1]
                 win = item[2]
+
+                # =========================================
+                # NORMALIZA COR
+                # =========================================
                 if isinstance(cor, dict):
                     cor = cor.get("cor", "DESCONHECIDO")
 
-                cor = str(cor)
-                horario = str(horario)
                 resultado_texto = "WIN" if win else "LOSS"
-                chave = (cor, horario, resultado_texto)
-                if chave in existentes:
-                    continue
 
                 writer.writerow([
                     datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    cor,
+                    str(cor),
                     horario,
                     resultado_texto
                 ])
-                existentes.add(chave)
+
                 print(f"💾 Resultado salvo: {resultado_texto}")
 
     except Exception as e:
@@ -696,27 +694,22 @@ async def enviar_relatorio():
         "Suporte @souza999br\n"
     )
 
-    enviado = False
-    for tentativa in range(1, 4):
-        try:
-            await bot.send_message(
-                chat_id=CHAT_ID,
-                text=relatorio
-            )
-            print(f"📊 Relatório enviado ao Telegram (tentativa {tentativa}/3).")
-            enviado = True
-            break
-        except Exception as e:
-            print(f"⚠️ Falha ao enviar relatório (tentativa {tentativa}/3): {e}")
-            if tentativa < 3:
-                await asyncio.sleep(2)
+    try:
 
-    # Só limpa as previsões da memória após confirmação do envio.
-    # Se as 3 tentativas falharem, o loop horário tentará novamente.
-    if enviado:
-        resultados.clear()
+        await bot.send_message(
+            chat_id=CHAT_ID,
+            text=relatorio
+        )
 
-    return enviado
+        print("📊 Relatório enviado!")
+
+    except Exception as e:
+        print(f"⚠️ Relatório erro: {e}")
+
+    # =====================================================
+    # LIMPA MEMÓRIA
+    # =====================================================
+    resultados.clear()
     
 # =========================================================
 # RESET
@@ -785,17 +778,14 @@ async def loop_previsoes():
                 ultima_hora_relatorio = agora.hour
 
             if agora.hour != ultima_hora_relatorio:
-                print(f"📊 Enviando placar da hora {ultima_hora_relatorio:02d}...")
 
-                # Envia mesmo que a lista esteja vazia, para não perder
-                # o placar da hora. Só avança a hora quando Telegram confirmar.
-                relatorio_enviado = await enviar_relatorio()
-                if relatorio_enviado:
-                    ultima_hora_relatorio = agora.hour
-                else:
-                    print("⚠️ Placar não confirmado pelo Telegram; nova tentativa em breve.")
-                    await asyncio.sleep(5)
-                    continue
+                print(f"📊 Enviando relatório da hora {ultima_hora_relatorio:02d}...")
+
+                if resultados:
+                    await enviar_relatorio()
+                    resultados.clear()
+
+                ultima_hora_relatorio = agora.hour
 
             # =====================================================
             # COLETA FINAL DAS APOSTAS
