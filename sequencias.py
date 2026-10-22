@@ -7,6 +7,7 @@ import re
 from bs4 import BeautifulSoup
 
 from datetime import datetime, timedelta
+from modelo_numeros import cor_por_codigo as cor_por_codigo_modelo, NUMEROS, CODIGO_PARA_NUMERO
 
 # ========================
 # ARQUIVOS
@@ -130,18 +131,11 @@ def salvar_codigo_desconhecido(codigo_img):
 
 
 def cor_por_codigo(codigo_img):
-
-    url = f"https://www.pa3333.com/static/game/{codigo_img}.png"
-
-    if url in IMAGENS_AZUL:
-        return "AZUL"
-
-    if url in IMAGENS_VERMELHO:
-        return "VERMELHO"
-
-    salvar_codigo_desconhecido(codigo_img)
-
-    return None
+    """Usa exclusivamente o mapa oficial de 12 números/48 imagens."""
+    cor = cor_por_codigo_modelo(codigo_img)
+    if cor is None:
+        salvar_codigo_desconhecido(codigo_img)
+    return cor
 
 
 # ========================

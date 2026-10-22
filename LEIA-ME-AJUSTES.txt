@@ -1,0 +1,17 @@
+AJUSTES REALIZADOS
+
+1. modelo_numeros.py é o mapa oficial único para os 12 números, as cores e os 48 códigos de imagem.
+2. A cor é calculada pelo número: ímpares = VERMELHO; pares = AZUL.
+3. A imagem enviada para uma previsão usa exatamente o código previsto: https://www.pa3333.com/static/game/CODIGO.png
+4. A nova estratégia de transições está em estrategia_transicoes.py.
+   - Registra transições consecutivas (ex.: 6 -> 10) em transicoes.csv.
+   - Só usa transições do bloco de quatro horas atual.
+   - Exige pelo menos 2 ocorrências e confiança mínima de 65%; para disparar a previsão, exige 3 ocorrências anteriores, de modo que o sinal sai na repetição seguinte.
+   - Em empate entre líderes, compara os dois líderes e escolhe o número que menos apareceu nos últimos 10 resultados.
+   - Limita a influência de uma mesma continuidade a 4 ocorrências na análise, sem apagar o CSV.
+   - Salva previsões em previsoes_codigo.csv.
+5. As estratégias antigas permanecem nos arquivos para preservar a estrutura, mas não decidem os sinais enviados; a previsão principal usa a nova estratégia.
+6. O reset da janela de análise ocorre às 02:00, 06:00, 10:00, 14:00, 18:00 e 22:00, seguindo blocos de quatro horas alinhados aos horários solicitados.
+7. Por segurança, o arquivo .env incluído está sem credenciais. Preencha TELEGRAM_TOKEN e CHAT_ID antes de executar.
+
+Observação: previsões estatísticas não garantem acertos.

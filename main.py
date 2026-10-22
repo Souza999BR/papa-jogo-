@@ -55,6 +55,8 @@ from sequencias import (
 
 # ================= CONFIGURAÇÕES =================
 from dotenv import load_dotenv
+from modelo_numeros import numero_por_codigo, cor_por_codigo as cor_oficial_por_codigo, url_imagem
+from estrategia_transicoes import prever_transicao, registrar_transicao, bloco_atual
 
 load_dotenv()
 
@@ -96,10 +98,10 @@ ultima_validacao_acessorio = None
 
 resultados = []
 
-ultima_hora_reset = datetime.now().hour
+ultima_hora_reset = bloco_atual()
 
 # ================= CONTROLE TENDÊNCIA =================
-hora_reset_tendencia = datetime.now().hour
+hora_reset_tendencia = bloco_atual()
 
 historico_tendencia = []
 
@@ -137,37 +139,97 @@ def carregar_historico_completo():
 # RESETAR TENDÊNCIA (A CADA HORA)
 # =========================================================
 def resetar_tendencia_se_necessario():
-
-    global hora_reset_tendencia
-    global historico_tendencia
-
-    hora_atual = datetime.now().hour
-
-    if hora_atual != hora_reset_tendencia:
-
-        hora_reset_tendencia = hora_atual
-
+    global hora_reset_tendencia, historico_tendencia
+    chave = bloco_atual()
+    if hora_reset_tendencia != chave:
+        hora_reset_tendencia = chave
         historico_tendencia = []
+        print(f"🔄 Janela de análise reiniciada no bloco iniciado em {chave}")
 
-        print(f"🔄 Tendência resetada às {hora_atual}:00")
+
+# =========================================================
+# LIMPAR AS 3 PRIMEIRAS HORAS DE CADA BLOCO DE 4 HORAS
+# Mantém a coleta da última hora de cada bloco:
+# 02:00–06:00 -> limpa às 05:00; mantém 05:00–06:00
+# 06:00–10:00 -> limpa às 09:00; mantém 09:00–10:00
+# Depois: 13:00, 17:00, 21:00 e 01:00
+# =========================================================
+def resetar_transicoes_se_necessario(agora=None):
+    """Limpa transicoes.csv no início da última hora de cada bloco de 4h, preservando o cabeçalho."""
+    agora = agora or datetime.now()
+
+    # O reset ocorre somente às 01:00, 05:00, 09:00, 13:00, 17:00 e 21:00.
+    # Assim, as três primeiras horas do bloco são apagadas e a última hora fica registrada.
+    horas_reset = {1, 5, 9, 13, 17, 21}
+    if agora.hour not in horas_reset:
+        return
+
+    chave_reset = agora.strftime("%Y-%m-%d %H:00")
+    arquivo_transicoes = os.path.join(os.getcwd(), "transicoes.csv")
+    marcador_reset = os.path.join(os.getcwd(), "transicoes_reset.marker")
+
+    try:
+        try:
+            with open(marcador_reset, "r", encoding="utf-8") as f:
+                ultimo_reset = f.read().strip()
+        except FileNotFoundError:
+            ultimo_reset = ""
+
+        # Evita limpar o arquivo repetidamente durante a mesma hora.
+        if ultimo_reset == chave_reset:
+            return
+
+        if os.path.exists(arquivo_transicoes):
+            # Preserva a primeira linha (cabeçalho) do CSV.
+            with open(arquivo_transicoes, "r", newline="", encoding="utf-8-sig") as f:
+                cabecalho = f.readline()
+
+            with open(arquivo_transicoes, "w", newline="", encoding="utf-8") as f:
+                if cabecalho:
+                    f.write(cabecalho)
+
+            print(f"🧹 transicoes.csv limpo às {chave_reset}; a partir de agora serão mantidos os dados da última hora do bloco.")
+        else:
+            print(f"ℹ️ transicoes.csv ainda não existe; reset registrado para {chave_reset}")
+
+        with open(marcador_reset, "w", encoding="utf-8") as f:
+            f.write(chave_reset)
+
+    except Exception as e:
+        print(f"⚠️ Erro ao resetar transicoes.csv: {e}")
 
 
 # =========================================================
 # ESCOLHER IMAGEM
 # =========================================================
 def escolher_imagem_exata(cor):
-
+    """Escolhe aleatoriamente uma imagem da cor prevista, sem alterar as análises específicas."""
     try:
+        cor = str(cor or "").strip().upper()
 
-        if cor == "AZUL" and IMAGENS_AZUL:
-            return random.choice(IMAGENS_AZUL)
+        if cor == "AZUL":
+            imagens = IMAGENS_AZUL
+        elif cor == "VERMELHO":
+            imagens = IMAGENS_VERMELHO
+        else:
+            return None
 
-        if cor == "VERMELHO" and IMAGENS_VERMELHO:
-            return random.choice(IMAGENS_VERMELHO)
+        if not imagens:
+            print(f"⚠️ Não há imagens cadastradas para a cor {cor}")
+            return None
+
+        imagem = random.choice(list(imagens))
+        imagem = str(imagem).strip()
+        if not imagem:
+            return None
+
+        # As listas podem conter o código puro ou a URL completa da imagem.
+        if imagem.lower().startswith(("http://", "https://")):
+            return imagem
+        return url_imagem(imagem.removesuffix(".PNG").removesuffix(".png"))
 
     except Exception as e:
-        print(f"⚠️ Erro imagem: {e}")
-
+        print(f"⚠️ Erro ao escolher imagem aleatória da cor {cor}: {e}")
     return None
 
 
@@ -325,106 +387,51 @@ async def enviar_previsao(
     cor_prevista,
     codigo_previsto=None,
     confianca=None,
-    acessorio=None
+    acessorio=None,
+    tipo_codigo="numero"
 ):
 
     if not cor_prevista:
-        return
+        return False
 
     horario = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # =====================================================
-    # REGRA PRINCIPAL:
-    # CÓDIGO TEM PRIORIDADE SOBRE ACESSÓRIO
-    # =====================================================
-    usar_acessorio = True
-
-    if (
-        codigo_previsto
-        and confianca is not None
-        and confianca >= 0.85
-    ):
-        usar_acessorio = False
-
-    # =====================================================
-    # NORMALIZA COR
-    # =====================================================
-    cor_base = (
-        cor_prevista["cor"]
-        if isinstance(cor_prevista, dict)
-        else cor_prevista
-    )
-
-    # =====================================================
-    # IMAGEM
-    # =====================================================
-    img_url = None
-
-    if usar_acessorio and acessorio:
-
-        try:
-
-            acessorio = acessorio.upper()
-
-            if cor_base.upper() == "AZUL":
-
-                if acessorio in CODIGOS_AZUL:
-
-                    codigo_img = CODIGOS_AZUL[acessorio][0]
-
-                    img_url = (
-                        f"https://www.pa3333.com/static/game/"
-                        f"{codigo_img}.png"
-                    )
-
-            elif cor_base.upper() == "VERMELHO":
-
-                if acessorio in CODIGOS_VERMELHO:
-
-                    codigo_img = CODIGOS_VERMELHO[acessorio][0]
-
-                    img_url = (
-                        f"https://www.pa3333.com/static/game/"
-                        f"{codigo_img}.png"
-                    )
-
-        except Exception as erro:
-            print(f"⚠️ Erro imagem acessório: {erro}")
-
-    # =====================================================
-    # FALLBACK PARA IMAGEM NORMAL DA COR
-    # =====================================================
+    cor_base = (cor_prevista["cor"] if isinstance(cor_prevista, dict) else cor_prevista)
+    cor_base = str(cor_base).upper()
+    # Prioriza a imagem do código previsto. Se não houver código válido,
+    # usa uma imagem oficial de referência da cor.
+    img_url = url_imagem(codigo_previsto) if codigo_previsto else None
     if not img_url:
         img_url = escolher_imagem_exata(cor_base)
-
-    # =====================================================
-    # DEBUG
-    # =====================================================
-    print(f"DEBUG cor = {cor_base}")
-    print(f"DEBUG codigo_previsto = {codigo_previsto}")
-    print(f"DEBUG confianca = {confianca}")
-    print(f"DEBUG acessorio = {acessorio}")
-    print(f"DEBUG usar_acessorio = {usar_acessorio}")
-    print(f"DEBUG img_url = {img_url}")
+    print(f"DEBUG cor = {cor_base}; código = {codigo_previsto}; imagem = {img_url}")
 
     # =====================================================
     # MENSAGEM BASE
     # =====================================================
     linha_previsao = f"🎯 Próxima previsão: {cor_base}"
 
-    if usar_acessorio and acessorio:
-        linha_previsao += f" | ACESSÓRIO: {acessorio}"
 
     mensagem = (
         f"⏰ {horario}\n"
         f"{linha_previsao}"
     )
 
+    # A previsão de acessório só pode entrar no placar se este campo
+    # fizer parte da mensagem realmente enviada ao Telegram.
+    if acessorio:
+        mensagem += f"\n🎩 Acessório previsto: {acessorio}"
+
     # =====================================================
-    # CÓDIGO PREVISTO
+    # CÓDIGO PREVISTO — rótulo conforme a análise que gerou o sinal
     # =====================================================
     if codigo_previsto:
-        mensagem += f"\n🔑 Código previsto: {codigo_previsto}"
+        tipo_rotulo = str(tipo_codigo or "numero").strip().lower()
+        if tipo_rotulo in ("acessorio", "acessório", "codigo", "código", "exata"):
+            rotulo_codigo = "Código do acessório previsto"
+        else:
+            # A estratégia por transições prevê um número, não um acessório.
+            rotulo_codigo = "Código do número previsto"
+        mensagem += f"\n🔑 {rotulo_codigo}: {codigo_previsto}"
 
     # =====================================================
     # CONFIANÇA
@@ -433,29 +440,37 @@ async def enviar_previsao(
         mensagem += f"\n📊 Confiança: {confianca:.1%}"
 
     # =====================================================
-    # ENVIO
+    # ENVIO ROBUSTO
+    # Uma falha ao carregar a imagem não pode bloquear o sinal.
     # =====================================================
-    try:
-
-        if img_url:
-
+    if img_url:
+        try:
             await bot.send_photo(
                 chat_id=CHAT_ID,
                 photo=img_url,
                 caption=mensagem
             )
+            print(f"📤 Previsão enviada com imagem: {cor_base}")
+            return True
+        except TelegramError as erro_foto:
+            print(f"⚠️ Falha ao enviar imagem da previsão: {erro_foto}")
+        except Exception as erro_foto:
+            print(f"⚠️ Erro inesperado ao enviar imagem: {erro_foto}")
 
-        else:
+    # Se a foto falhar ou não existir, envia a previsão como texto.
+    try:
+        await bot.send_message(
+            chat_id=CHAT_ID,
+            text=mensagem
+        )
+        print(f"📤 Previsão enviada como texto: {cor_base}")
+        return True
+    except TelegramError as erro_texto:
+        print(f"❌ Telegram recusou o envio da previsão em texto: {erro_texto}")
+    except Exception as erro_texto:
+        print(f"❌ Erro inesperado ao enviar previsão em texto: {erro_texto}")
 
-            await bot.send_message(
-                chat_id=CHAT_ID,
-                text=mensagem
-            )
-
-        print(f"📤 Previsão enviada: {cor_base}")
-
-    except Exception as e:
-        print(f"⚠️ Erro previsão: {e}")
+    return False
         
 # =========================================================
 # RESULTADO
@@ -514,22 +529,9 @@ async def enviar_relatorio():
             leitor = csv.reader(f)
             linhas_csv = list(leitor)
 
-        if len(linhas_csv) > 1:
-
-            ultima_hora_csv = linhas_csv[-1][0][:13]
-
-            if ultima_hora_csv != hora_atual:
-
-                with open(arquivo_resultados, "w", newline="", encoding="utf-8") as f:
-                    writer = csv.writer(f)
-                    writer.writerow([
-                        "Timestamp",
-                        "Cor",
-                        "Horario",
-                        "Resultado"
-                    ])
-
-                print(f"🗑️ resultados.csv resetado às {hora_atual}:00")
+        # Mantém o CSV até o relatório ser entregue com sucesso.
+        # O arquivo não é apagado aqui: se o Telegram falhar na virada
+        # da hora, o bot precisa conseguir reenviar o mesmo placar.
 
     except Exception as e:
         print(f"⚠️ Erro reset CSV: {e}")
@@ -539,33 +541,48 @@ async def enviar_relatorio():
     # =====================================================
     try:
 
+        # Evita gravar duplicados se o Telegram falhar e o relatório
+        # precisar ser tentado novamente.
+        existentes = set()
+        try:
+            with open(arquivo_resultados, "r", newline="", encoding="utf-8") as f:
+                leitor_existente = csv.DictReader(f)
+                for linha in leitor_existente:
+                    existentes.add((
+                        str(linha.get("Cor", "")).strip(),
+                        str(linha.get("Horario", "")).strip(),
+                        str(linha.get("Resultado", "")).strip().upper(),
+                    ))
+        except Exception:
+            pass
+
         with open(arquivo_resultados, "a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
 
             for item in resultados:
-
                 if not item or len(item) < 3:
                     continue
 
                 cor = item[0]
                 horario = item[1]
                 win = item[2]
-
-                # =========================================
-                # NORMALIZA COR
-                # =========================================
                 if isinstance(cor, dict):
                     cor = cor.get("cor", "DESCONHECIDO")
 
+                cor = str(cor)
+                horario = str(horario)
                 resultado_texto = "WIN" if win else "LOSS"
+                chave = (cor, horario, resultado_texto)
+                if chave in existentes:
+                    continue
 
                 writer.writerow([
                     datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    str(cor),
+                    cor,
                     horario,
                     resultado_texto
                 ])
-
+                existentes.add(chave)
                 print(f"💾 Resultado salvo: {resultado_texto}")
 
     except Exception as e:
@@ -684,22 +701,27 @@ async def enviar_relatorio():
         "Suporte @souza999br\n"
     )
 
-    try:
+    enviado = False
+    for tentativa in range(1, 4):
+        try:
+            await bot.send_message(
+                chat_id=CHAT_ID,
+                text=relatorio
+            )
+            print(f"📊 Relatório enviado ao Telegram (tentativa {tentativa}/3).")
+            enviado = True
+            break
+        except Exception as e:
+            print(f"⚠️ Falha ao enviar relatório (tentativa {tentativa}/3): {e}")
+            if tentativa < 3:
+                await asyncio.sleep(2)
 
-        await bot.send_message(
-            chat_id=CHAT_ID,
-            text=relatorio
-        )
+    # Só limpa as previsões da memória após confirmação do envio.
+    # Se as 3 tentativas falharem, o loop horário tentará novamente.
+    if enviado:
+        resultados.clear()
 
-        print("📊 Relatório enviado!")
-
-    except Exception as e:
-        print(f"⚠️ Relatório erro: {e}")
-
-    # =====================================================
-    # LIMPA MEMÓRIA
-    # =====================================================
-    resultados.clear()
+    return enviado
     
 # =========================================================
 # RESET
@@ -751,12 +773,16 @@ async def loop_previsoes():
 
             agora = datetime.now()
 
+            # ================= LIMPEZA DAS 3 PRIMEIRAS HORAS DO BLOCO =================
+            resetar_transicoes_se_necessario(agora)
+
             # ================= RESET TENDÊNCIA =================
             resetar_tendencia_se_necessario()
 
             # ================= RESET BOT =================
-            if agora.hour != ultima_hora_reset:
-                ultima_hora_reset = agora.hour
+            bloco_reset = bloco_atual()
+            if bloco_reset != ultima_hora_reset:
+                ultima_hora_reset = bloco_reset
                 await resetar_bot()
 
             # ================= RELATÓRIO POR HORA =================
@@ -764,14 +790,17 @@ async def loop_previsoes():
                 ultima_hora_relatorio = agora.hour
 
             if agora.hour != ultima_hora_relatorio:
+                print(f"📊 Enviando placar da hora {ultima_hora_relatorio:02d}...")
 
-                print(f"📊 Enviando relatório da hora {ultima_hora_relatorio:02d}...")
-
-                if resultados:
-                    await enviar_relatorio()
-                    resultados.clear()
-
-                ultima_hora_relatorio = agora.hour
+                # Envia mesmo que a lista esteja vazia, para não perder
+                # o placar da hora. Só avança a hora quando Telegram confirmar.
+                relatorio_enviado = await enviar_relatorio()
+                if relatorio_enviado:
+                    ultima_hora_relatorio = agora.hour
+                else:
+                    print("⚠️ Placar não confirmado pelo Telegram; nova tentativa em breve.")
+                    await asyncio.sleep(5)
+                    continue
 
             # =====================================================
             # COLETA FINAL DAS APOSTAS
@@ -809,6 +838,7 @@ async def loop_previsoes():
             historico_tendencia = historico_tendencia[-60:]
 
             historico = carregar_historico_completo()
+            registrar_transicao(historico, agora.strftime("%Y-%m-%d %H:%M:%S"))
 
             # ================= VALIDAR RESULTADO =================
             if ultima_previsao:
@@ -862,52 +892,118 @@ async def loop_previsoes():
 
                 ultima_previsao = None
 
-            # ================= PREVISÃO =================
+            # ================= PREVISÕES =================
+            # Executa as duas estratégias independentes. Se ambas gerarem
+            # sinal no mesmo ciclo, a previsão por CÓDIGO tem prioridade.
             previsao_cor = None
             previsao_codigo = None
             confianca = None
+            tipo_previsao = "numero"
+            previsao_transicao_cor = None
+            previsao_transicao_codigo = None
+            confianca_transicao = None
 
             # =====================================================
-            # 1 - PRESSÃO
+            # 1 - PRESSÃO (mantida como alternativa)
             # =====================================================
             resultado_pressao = calcular_pressao_apostas()
-
             if resultado_pressao:
-
                 cor_pressao = resultado_pressao.get("cor")
                 forca_pressao = resultado_pressao.get("forca")
-
                 if cor_pressao in ["AZUL", "VERMELHO"]:
-
                     previsao_cor = cor_pressao
-                    confianca = min(forca_pressao / 1000, 0.99)
+                    try:
+                        confianca = min(float(forca_pressao) / 1000, 0.99)
+                    except (TypeError, ValueError):
+                        confianca = None
 
             # =====================================================
-            # 2 - CÓDIGO
+            # 2 - PREVISÃO POR CÓDIGO (PRIORIDADE MÁXIMA)
             # =====================================================
             resultado_codigo = calcular_previsao_exata(historico)
-
             if resultado_codigo:
-
-                codigo_prev, cor_prev, confianca_prev = resultado_codigo
-
-                if previsao_cor:
-
-                    if cor_prev == previsao_cor:
-                        previsao_codigo = codigo_prev
-                        confianca = max(confianca or 0, confianca_prev)
-
-                else:
-
-                    previsao_cor = cor_prev
-                    previsao_codigo = codigo_prev
-                    confianca = confianca_prev
+                try:
+                    codigo_prev, cor_prev, confianca_prev = resultado_codigo[:3]
+                    cor_prev = str(cor_prev).upper() if cor_prev else None
+                    if codigo_prev and cor_prev in ("AZUL", "VERMELHO"):
+                        previsao_codigo = str(codigo_prev).strip().upper()
+                        previsao_cor = cor_prev
+                        confianca = confianca_prev
+                        # calcular_previsao_exata gera o código do acessório.
+                        tipo_previsao = "acessorio"
+                        print(f"🔑 Prioridade código/acessório: {previsao_codigo} ({previsao_cor})")
+                except (TypeError, ValueError, IndexError) as e:
+                    print(f"⚠️ Retorno da previsão por código inválido: {e}")
 
             # =====================================================
-            # 3 - COR
+            # 3 - PREVISÃO POR TRANSIÇÃO (USADA SE CÓDIGO NÃO EXISTIR)
+            # =====================================================
+            try:
+                resultado_transicao = prever_transicao(historico)
+                if resultado_transicao:
+                    if isinstance(resultado_transicao, dict):
+                        previsao_transicao_codigo = (
+                            resultado_transicao.get("codigo")
+                            or resultado_transicao.get("codigo_previsto")
+                            or resultado_transicao.get("codigo_numero")
+                        )
+                        previsao_transicao_cor = (
+                            resultado_transicao.get("cor")
+                            or resultado_transicao.get("cor_prevista")
+                        )
+                        confianca_transicao = (
+                            resultado_transicao.get("confianca")
+                            or resultado_transicao.get("confidence")
+                        )
+                        numero_transicao = (
+                            resultado_transicao.get("numero")
+                            or resultado_transicao.get("numero_previsto")
+                        )
+                        if not previsao_transicao_codigo and numero_transicao:
+                            # Não inventa código de acessório: a transição é por número.
+                            previsao_transicao_codigo = None
+                            if not previsao_transicao_cor:
+                                try:
+                                    previsao_transicao_cor = "VERMELHO" if int(numero_transicao) % 2 else "AZUL"
+                                except (TypeError, ValueError):
+                                    pass
+                    elif isinstance(resultado_transicao, (tuple, list)):
+                        if len(resultado_transicao) >= 3:
+                            primeiro, segundo, terceiro = resultado_transicao[:3]
+                            # Formato comum: (código, cor, confiança) ou (número, cor, confiança).
+                            if isinstance(segundo, str) and segundo.upper() in ("AZUL", "VERMELHO"):
+                                previsao_transicao_cor = segundo.upper()
+                                confianca_transicao = terceiro
+                                valor = str(primeiro).strip().upper()
+                                if len(valor) >= 20 and all(c in "0123456789ABCDEF" for c in valor):
+                                    previsao_transicao_codigo = valor
+                                else:
+                                    try:
+                                        numero_transicao = int(primeiro)
+                                        previsao_transicao_cor = "VERMELHO" if numero_transicao % 2 else "AZUL"
+                                    except (TypeError, ValueError):
+                                        pass
+                    if previsao_transicao_cor:
+                        previsao_transicao_cor = str(previsao_transicao_cor).upper()
+                        if previsao_transicao_cor not in ("AZUL", "VERMELHO"):
+                            previsao_transicao_cor = None
+                    if previsao_transicao_codigo:
+                        previsao_transicao_codigo = str(previsao_transicao_codigo).strip().upper()
+            except Exception as e:
+                print(f"⚠️ Erro na previsão por transição: {e}")
+
+            # Código vence se as duas estratégias sinalizarem simultaneamente.
+            if not previsao_codigo and previsao_transicao_cor:
+                previsao_cor = previsao_transicao_cor
+                previsao_codigo = previsao_transicao_codigo
+                confianca = confianca_transicao
+                tipo_previsao = "transicao"
+                print("🔁 Usando previsão por transição (sem previsão válida por código).")
+
+            # =====================================================
+            # 4 - COR (fallback; preservado)
             # =====================================================
             resultado_cor = calcular_previsao_exata_por_cor(historico)
-
             if resultado_cor and not previsao_cor:
                 previsao_cor = resultado_cor.get("cor")
 
@@ -950,23 +1046,34 @@ async def loop_previsoes():
                 except Exception as e:
                     print(f"⚠️ Erro previsão acessório: {e}")
 
-                # 🔥 IMPORTANTE: agora tudo é dict consistente
-                ultima_previsao = {
-                    "cor": previsao_cor,
-                    "codigo": previsao_codigo
-                }
-                
-                
-
-                await enviar_previsao(
+                # Só registra a previsão para o placar se o Telegram confirmar
+                # o envio da foto ou da mensagem de texto.
+                enviado_telegram = await enviar_previsao(
                     previsao_cor,
                     previsao_codigo,
                     confianca,
-                    acessorio_previsto
+                    acessorio_previsto,
+                    tipo_codigo=tipo_previsao
                 )
-                
-                if usar_acessorio and acessorio_previsto:
-                    ativar_previsao_acessorio()
+
+                if enviado_telegram:
+                    ultima_previsao = {
+                        "cor": previsao_cor,
+                        "codigo": previsao_codigo,
+                        "enviada_telegram": True
+                    }
+                    print("✅ Previsão registrada para validação e placar: enviada ao Telegram.")
+
+                    if usar_acessorio and acessorio_previsto:
+                        ativar_previsao_acessorio()
+                    else:
+                        cancelar_previsao_acessorio()
+                else:
+                    # A mensagem falhou: não pode deixar previsão de acessório
+                    # pendente nem somá-la ao placar quando chegar o resultado.
+                    cancelar_previsao_acessorio()
+                    ultima_previsao = None
+                    print("⚠️ Previsão não enviada ao Telegram; não será incluída no placar.")
 
             # ================= ESPERA =================
             proximo = (agora + timedelta(minutes=1)).replace(
