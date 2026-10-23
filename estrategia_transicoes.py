@@ -7,9 +7,12 @@ Adaptada da análise do userscript PA333:
 - Previsão de número único: exige pelo menos 3 ocorrências.
 - Em empate na maior frequência: exige pelo menos 2 ocorrências por candidato
   e mantém os dois maiores candidatos.
-- Para enviar ao Telegram, escolhe apenas UM número: entre os dois empatados,
-  seleciona o que apareceu menos nos últimos 10 resultados.
-- Se os dois apareceram igualmente nos últimos 10, desempata pelo menor número.
+- Remove as transições antigas de uma sequência consecutiva quando ela passa
+  de quatro repetições, mantendo as quatro mais recentes.
+- Em empate, seleciona os dois maiores números entre os líderes empatados.
+- Não envia sinal se os dois candidatos tiverem cores diferentes.
+- Para enviar ao Telegram, escolhe apenas UM número: o menos frequente nos
+  últimos 5 resultados; em igualdade, desempata pelo menor número.
 """
 import csv
 import os
@@ -75,6 +78,27 @@ def _ler_transicoes(bloco):
     return saida
 
 
+def _remover_continuidades_antigas(transicoes):
+    """Mantém no máximo as 4 últimas transições de cada repetição consecutiva."""
+    resultado = []
+    inicio = 0
+
+    while inicio < len(transicoes):
+        transicao = transicoes[inicio]
+        fim = inicio + 1
+
+        while fim < len(transicoes) and transicoes[fim] == transicao:
+            fim += 1
+
+        # Se a mesma transição se repetiu em sequência mais de 4 vezes,
+        # descarta as mais antigas e preserva as quatro últimas.
+        inicio_mantido = max(inicio, fim - MAX_CONTINUIDADE)
+        resultado.extend(transicoes[inicio_mantido:fim])
+        inicio = fim
+
+    return resultado
+
+
 def prever_transicao(historico):
     """Retorna dict com número único escolhido, cor, código, confiança e estatísticas.
 
@@ -105,16 +129,20 @@ def prever_transicao(historico):
         if origem is not None and destino is not None:
             transicoes.append((origem, destino))
 
-    candidatos = [destino for origem, destino in transicoes if origem == numero_atual]
+    # Primeiro considera apenas as transições que partiram do número atual.
+    # Depois remove somente as transições antigas de repetições consecutivas
+    # acima do limite; não limita artificialmente toda contagem de destino.
+    transicoes_candidatas = [
+        (origem, destino)
+        for origem, destino in transicoes
+        if origem == numero_atual
+    ]
+    transicoes_candidatas = _remover_continuidades_antigas(transicoes_candidatas)
+    candidatos = [destino for _, destino in transicoes_candidatas]
     if not candidatos:
         return None
 
-    # Limita o peso de uma mesma continuidade a quatro ocorrências.
-    contagens_brutas = Counter(candidatos)
-    contagens = Counter({
-        numero: min(quantidade, MAX_CONTINUIDADE)
-        for numero, quantidade in contagens_brutas.items()
-    })
+    contagens = Counter(candidatos)
 
     maior = max(contagens.values())
     # Primeiro identifica todos os números na frequência máxima. O mínimo
@@ -142,9 +170,13 @@ def prever_transicao(historico):
 
         dois_candidatos = sorted(lideres, reverse=True)[:2]
 
+        # Se os dois candidatos forem de cores diferentes, bloqueia o sinal.
+        # O retorno None impede que o chamador envie uma previsão ao Telegram.
+        if cor_por_numero(dois_candidatos[0]) != cor_por_numero(dois_candidatos[1]):
+            return None
+
         # A análise dos ÚLTIMOS 5 resultados decide qual único número
-        # será enviado ao Telegram. O que apareceu menos é priorizado;
-        # se um candidato acabou de sair e o outro não, isso favorece o outro.
+        # será enviado ao Telegram. O que apareceu menos é priorizado.
         ultimos_numeros = []
         for item in historico[-JANELA_RECENTE:]:
             try:
@@ -169,7 +201,7 @@ def prever_transicao(historico):
             return None
 
         # A confiança mínima é aplicada somente quando há um único líder.
-        # Em empate válido, a confiança não bloqueia a previsão.
+        # Em empate válido e de mesma cor, a confiança não bloqueia a previsão.
         if confianca < CONFIANCA_MINIMA:
             return None
 
