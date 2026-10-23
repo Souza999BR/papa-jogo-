@@ -1011,24 +1011,26 @@ async def loop_previsoes():
                 acessorio_previsto = None
 
                 try:
-
-                    usar_acessorio = True
-
-                    if (
-                        previsao_codigo
-                        and confianca is not None
-                        and confianca >= 0.74
-                    ):
-                        usar_acessorio = False
-
-                        print(
-                            f"🔑 Código forte detectado ({confianca:.1%}) - acessório bloqueado"
+                    # O acessório só pode acompanhar a previsão normal da cor.
+                    # Previsões por código ou por transição nunca enviam acessório.
+                    tipo_atual = str(tipo_previsao or "numero").strip().lower()
+                    previsao_por_codigo_ou_transicao = (
+                        bool(previsao_codigo)
+                        or tipo_atual in (
+                            "acessorio", "acessório",
+                            "codigo", "código", "exata",
+                            "transicao", "transição"
                         )
-                        
+                    )
+
+                    usar_acessorio = not previsao_por_codigo_ou_transicao
+
+                    if not usar_acessorio:
                         cancelar_previsao_acessorio()
-
-                    if usar_acessorio:
-
+                        print(
+                            f"🔒 Sinal de acessório bloqueado para previsão do tipo: {tipo_atual}"
+                        )
+                    else:
                         resultado_acessorio = prever_proximo_acessorio()
 
                         print(f"DEBUG ACESSÓRIO: {resultado_acessorio}")
@@ -1040,6 +1042,8 @@ async def loop_previsoes():
                                 acessorio_previsto = None
 
                 except Exception as e:
+                    usar_acessorio = False
+                    acessorio_previsto = None
                     print(f"⚠️ Erro previsão acessório: {e}")
 
                 # Só registra a previsão para o placar se o Telegram confirmar
