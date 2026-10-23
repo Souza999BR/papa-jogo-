@@ -95,6 +95,8 @@ ultima_hora_relatorio_enviado = None
 obter_resultado_acessorio()
 
 ultima_validacao_acessorio = None
+ultima_previsao_acessorio_enviada = False
+ultima_previsao_acessorio_enviada = False
 
 resultados = []
 
@@ -429,6 +431,12 @@ async def enviar_previsao(
         mensagem += f"\n🔑 {rotulo_codigo}: {codigo_previsto}"
 
     # =====================================================
+    # ACESSÓRIO PREVISTO
+    # =====================================================
+    if acessorio:
+        mensagem += f"\\n🎩 Acessório previsto: {acessorio}"
+
+    # =====================================================
     # CONFIANÇA
     # =====================================================
     if confianca is not None:
@@ -752,6 +760,7 @@ async def loop_previsoes():
     global historico_tendencia
     global ultima_hora_relatorio
     global ultima_validacao_acessorio
+    global ultima_previsao_acessorio_enviada
 
     print("🚀 Sistema iniciado!")
 
@@ -841,17 +850,19 @@ async def loop_previsoes():
                 )
 
                 # ================= VALIDAÇÃO ACESSÓRIO =================
-                try:
-                    chave_validacao = (
-                        agora.strftime("%Y-%m-%d %H:%M"),
-                        codigo_atual
-                    )
-                    if chave_validacao != ultima_validacao_acessorio:
-                        processar_validacao_acessorio()
-                        ultima_validacao_acessorio = chave_validacao
-                        
-                except Exception as e:
-                    print(f"⚠️ Erro validação acessório: {e}")
+                # Só contabiliza acessórios quando houve previsão enviada ao Telegram.
+                if ultima_previsao_acessorio_enviada:
+                    try:
+                        chave_validacao = (
+                            agora.strftime("%Y-%m-%d %H:%M"),
+                            codigo_atual
+                        )
+                        if chave_validacao != ultima_validacao_acessorio:
+                            processar_validacao_acessorio()
+                            ultima_validacao_acessorio = chave_validacao
+                            ultima_previsao_acessorio_enviada = False
+                    except Exception as e:
+                        print(f"⚠️ Erro validação acessório: {e}")
 
                 # ================= SALVAR CSV =================
                 try:
@@ -1051,8 +1062,16 @@ async def loop_previsoes():
 
                     if usar_acessorio and acessorio_previsto:
                         ativar_previsao_acessorio()
+                        ultima_previsao_acessorio_enviada = True
+                        print(
+                            f"✅ Acessório '{acessorio_previsto}' enviado ao Telegram; "
+                            "habilitado para entrar no placar."
+                        )
+                    else:
+                        ultima_previsao_acessorio_enviada = False
                 else:
                     ultima_previsao = None
+                    ultima_previsao_acessorio_enviada = False
                     print("⚠️ Previsão não enviada ao Telegram; não será incluída no placar.")
 
             # ================= ESPERA =================

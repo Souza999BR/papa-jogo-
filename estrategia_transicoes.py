@@ -24,7 +24,7 @@ MIN_OCORRENCIAS_UNICO = 3
 MIN_OCORRENCIAS_EMPATE = 2
 CONFIANCA_MINIMA = 0.65
 MAX_CONTINUIDADE = 4
-JANELA_RECENTE = 9
+JANELA_RECENTE = 5
 JANELA_ANALISE = 60
 
 
@@ -142,7 +142,7 @@ def prever_transicao(historico):
 
         dois_candidatos = sorted(lideres, reverse=True)[:2]
 
-        # A análise dos ÚLTIMOS 10 resultados decide qual único número
+        # A análise dos ÚLTIMOS 5 resultados decide qual único número
         # será enviado ao Telegram. O que apareceu menos é priorizado;
         # se um candidato acabou de sair e o outro não, isso favorece o outro.
         ultimos_numeros = []
