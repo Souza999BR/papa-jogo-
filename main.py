@@ -15,6 +15,8 @@ from telegram.error import TelegramError
 
 from telegram.request import HTTPXRequest
 
+from acessorio import ativar_previsao_acessorio
+
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -25,6 +27,16 @@ from PIL import (
     Image,
     ImageDraw,
     ImageFont
+)
+
+
+from acessorio import (
+    prever_proximo_acessorio,
+    obter_resultado_acessorio,
+    processar_validacao_acessorio,
+    cancelar_previsao_acessorio,
+    CODIGOS_AZUL,
+    CODIGOS_VERMELHO
 )
 
 
@@ -80,6 +92,11 @@ ultima_previsao = None
 
 ultima_hora_relatorio_enviado = None
 
+obter_resultado_acessorio()
+
+ultima_validacao_acessorio = None
+ultima_previsao_acessorio_enviada = False
+ultima_previsao_acessorio_enviada = False
 
 resultados = []
 
@@ -372,6 +389,7 @@ async def enviar_previsao(
     cor_prevista,
     codigo_previsto=None,
     confianca=None,
+    acessorio=None,
     tipo_codigo="numero"
 ):
 
@@ -405,12 +423,18 @@ async def enviar_previsao(
     # =====================================================
     if codigo_previsto:
         tipo_rotulo = str(tipo_codigo or "numero").strip().lower()
-        if tipo_rotulo in ("codigo", "código", "exata"):
-            rotulo_codigo = "Código previsto"
+        if tipo_rotulo in ("acessorio", "acessório", "codigo", "código", "exata"):
+            rotulo_codigo = "Código do acessório previsto"
         else:
             # A estratégia por transições prevê um número, não um acessório.
             rotulo_codigo = "Código do número previsto"
         mensagem += f"\n🔑 {rotulo_codigo}: {codigo_previsto}"
+
+    # =====================================================
+    # ACESSÓRIO PREVISTO
+    # =====================================================
+    if acessorio:
+        mensagem += f"\\n🎩 Acessório previsto: {acessorio}"
 
     # =====================================================
     # CONFIANÇA
@@ -593,6 +617,23 @@ async def enviar_relatorio():
         print(f"⚠️ Erro lendo CSV: {e}")
 
     # =====================================================
+    # ACESSÓRIOS
+    # =====================================================
+    try:
+
+        acc = obter_resultado_acessorio()
+
+        acessorio_wins = acc.get("wins", 0)
+        acessorio_losses = acc.get("loss", 0)
+
+    except Exception as e:
+
+        print(f"⚠️ Erro acessório: {e}")
+
+        acessorio_wins = 0
+        acessorio_losses = 0
+
+    # =====================================================
     # RELATÓRIO VISUAL (LENDO CSV)
     # =====================================================
     linhas = []
@@ -649,6 +690,10 @@ async def enviar_relatorio():
 
         f"✅ WINS: {wins}\n"
         f"❌ LOSS: {losses}\n\n"
+
+        "🎩 RESULTADO ACESSÓRIOS\n"
+        f"✅ WINS: {acessorio_wins}\n"
+        f"❌ LOSS: {acessorio_losses}\n\n"
 
         "🚀 Enquanto muitos estão testando estratégia, aqui é resultado real!\n"
         "💹 Se ainda está só assistindo… tá perdendo oportunidade.\n\n"
@@ -714,6 +759,8 @@ async def loop_previsoes():
     global ultima_hora_reset
     global historico_tendencia
     global ultima_hora_relatorio
+    global ultima_validacao_acessorio
+    global ultima_previsao_acessorio_enviada
 
     print("🚀 Sistema iniciado!")
 
@@ -802,6 +849,21 @@ async def loop_previsoes():
                     (cor_esperada, hora_ref, acertou)
                 )
 
+                # ================= VALIDAÇÃO ACESSÓRIO =================
+                # Só contabiliza acessórios quando houve previsão enviada ao Telegram.
+                if ultima_previsao_acessorio_enviada:
+                    try:
+                        chave_validacao = (
+                            agora.strftime("%Y-%m-%d %H:%M"),
+                            codigo_atual
+                        )
+                        if chave_validacao != ultima_validacao_acessorio:
+                            processar_validacao_acessorio()
+                            ultima_validacao_acessorio = chave_validacao
+                            ultima_previsao_acessorio_enviada = False
+                    except Exception as e:
+                        print(f"⚠️ Erro validação acessório: {e}")
+
                 # ================= SALVAR CSV =================
                 try:
 
@@ -863,9 +925,9 @@ async def loop_previsoes():
                         previsao_codigo = str(codigo_prev).strip().upper()
                         previsao_cor = cor_prev
                         confianca = confianca_prev
-                        # Mantém a previsão por código, sem sinal de acessório.
-                        tipo_previsao = "codigo"
-                        print(f"🔑 Prioridade código: {previsao_codigo} ({previsao_cor})")
+                        # calcular_previsao_exata gera o código do acessório.
+                        tipo_previsao = "acessorio"
+                        print(f"🔑 Prioridade código/acessório: {previsao_codigo} ({previsao_cor})")
                 except (TypeError, ValueError, IndexError) as e:
                     print(f"⚠️ Retorno da previsão por código inválido: {e}")
 
@@ -942,13 +1004,55 @@ async def loop_previsoes():
                 previsao_cor = resultado_cor.get("cor")
 
             # =====================================================
-            # ENVIO FINAL — somente sinais principais de cor/código/transição
+            # ENVIO FINAL
             # =====================================================
             if previsao_cor:
+
+                acessorio_previsto = None
+
+                try:
+                    # O acessório só pode acompanhar a previsão normal da cor.
+                    # Previsões por código ou por transição nunca enviam acessório.
+                    tipo_atual = str(tipo_previsao or "numero").strip().lower()
+                    previsao_por_codigo_ou_transicao = (
+                        bool(previsao_codigo)
+                        or tipo_atual in (
+                            "acessorio", "acessório",
+                            "codigo", "código", "exata",
+                            "transicao", "transição"
+                        )
+                    )
+
+                    usar_acessorio = not previsao_por_codigo_ou_transicao
+
+                    if not usar_acessorio:
+                        cancelar_previsao_acessorio()
+                        print(
+                            f"🔒 Sinal de acessório bloqueado para previsão do tipo: {tipo_atual}"
+                        )
+                    else:
+                        resultado_acessorio = prever_proximo_acessorio()
+
+                        print(f"DEBUG ACESSÓRIO: {resultado_acessorio}")
+
+                        if resultado_acessorio:
+                            acessorio_previsto = resultado_acessorio.get("acessorio")
+
+                            if acessorio_previsto == "DESCONHECIDO":
+                                acessorio_previsto = None
+
+                except Exception as e:
+                    usar_acessorio = False
+                    acessorio_previsto = None
+                    print(f"⚠️ Erro previsão acessório: {e}")
+
+                # Só registra a previsão para o placar se o Telegram confirmar
+                # o envio da foto ou da mensagem de texto.
                 enviado_telegram = await enviar_previsao(
                     previsao_cor,
                     previsao_codigo,
                     confianca,
+                    acessorio_previsto,
                     tipo_codigo=tipo_previsao
                 )
 
@@ -956,13 +1060,23 @@ async def loop_previsoes():
                     ultima_previsao = {
                         "cor": previsao_cor,
                         "codigo": previsao_codigo,
-                        "tipo": tipo_previsao,
                         "enviada_telegram": True
                     }
-                    print("✅ Sinal principal registrado: cor/código/transição enviado ao Telegram.")
+                    print("✅ Previsão registrada para validação e placar: enviada ao Telegram.")
+
+                    if usar_acessorio and acessorio_previsto:
+                        ativar_previsao_acessorio()
+                        ultima_previsao_acessorio_enviada = True
+                        print(
+                            f"✅ Acessório '{acessorio_previsto}' enviado ao Telegram; "
+                            "habilitado para entrar no placar."
+                        )
+                    else:
+                        ultima_previsao_acessorio_enviada = False
                 else:
                     ultima_previsao = None
-                    print("⚠️ Previsão principal não enviada ao Telegram.")
+                    ultima_previsao_acessorio_enviada = False
+                    print("⚠️ Previsão não enviada ao Telegram; não será incluída no placar.")
 
             # ================= ESPERA =================
             proximo = (agora + timedelta(minutes=1)).replace(
